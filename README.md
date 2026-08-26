@@ -1,6 +1,5 @@
 # RecoverAI — AI Revenue Recovery Platform
-
-> **Razorpay AI Buildathon Submission**  
+  
 > **Autonomous Closed-Loop Revenue Recovery Engine: Detect → Diagnose → Decide → Act → Verify → Stop/Escalate → Measure → Audit**
 
 RecoverAI detects revenue at risk, determines the optimal win-back intervention, and executes bounded recovery workflows—from transaction gateway outages and mobile checkout dropoffs to recurring mandate failures and overdue B2B receivables.
