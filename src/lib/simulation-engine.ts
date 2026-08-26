@@ -22,9 +22,24 @@ export interface BatchSimulationResult {
   failedCount: number;
   totalValueAtRisk: number;
   totalValueRecovered: number;
+  predictedRecoverableValue: number;
+  verifiedRecoveredValue: number;
+  stoppedCount: number;
+  decisionDistribution: Record<string, number>;
+  decisionFactors: Record<string, number>;
   recoveryRatePct: number;
   averageExecutionLatencyMs: number;
-  cases: any[];
+  cases: Array<{
+    id: string;
+    customerName: string;
+    amount: number;
+    playbook: PlaybookType;
+    status: string;
+    recovered: boolean;
+    escalated: boolean;
+    recoveredAmount: number;
+    predictedRecoverable: number;
+  }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -212,10 +227,15 @@ export class SimulationEngine {
     let recoveredCount     = 0;
     let escalatedCount     = 0;
     let failedCount        = 0;
-    const caseResults: any[] = [];
+    let predictedRecoverableValue = 0;
+    let stoppedCount = 0;
+    const decisionDistribution: Record<string, number> = {};
+    const decisionFactors: Record<string, number> = {};
+    const caseResults: BatchSimulationResult['cases'] = [];
 
     for (const recCase of generatedCases) {
       totalValueAtRisk += recCase.amount;
+      predictedRecoverableValue += Math.round(recCase.amount * recCase.recovery_confidence / 100);
 
       if (config.autonomousAutoExecute !== false) {
         const res = await RecoveryPipeline.processCase(recCase.id);
@@ -229,6 +249,14 @@ export class SimulationEngine {
         } else {
           failedCount += 1;
         }
+        if (res.stopped) stoppedCount += 1;
+        const decision = res.case.ai_decision;
+        if (decision) {
+          decisionDistribution[decision.selectedPlaybook] = (decisionDistribution[decision.selectedPlaybook] || 0) + 1;
+          decision.decisionFactors.forEach(factor => {
+            if (factor.signal === 'POSITIVE') decisionFactors[factor.factor] = (decisionFactors[factor.factor] || 0) + 1;
+          });
+        }
 
         caseResults.push({
           id:            res.case.id,
@@ -239,6 +267,7 @@ export class SimulationEngine {
           recovered:     res.recovered,
           escalated:     res.escalated,
           recoveredAmount: res.case.recovered_amount || 0,
+          predictedRecoverable: Math.round(recCase.amount * recCase.recovery_confidence / 100),
         });
       } else {
         failedCount += 1;
@@ -251,6 +280,7 @@ export class SimulationEngine {
           recovered:    false,
           escalated:    false,
           recoveredAmount: 0,
+          predictedRecoverable: Math.round(recCase.amount * recCase.recovery_confidence / 100),
         });
       }
     }
@@ -268,6 +298,11 @@ export class SimulationEngine {
       failedCount,
       totalValueAtRisk,
       totalValueRecovered,
+      predictedRecoverableValue,
+      verifiedRecoveredValue: totalValueRecovered,
+      stoppedCount,
+      decisionDistribution,
+      decisionFactors,
       recoveryRatePct,
       averageExecutionLatencyMs: count > 0 ? Math.round(durationMs / count) : 0,
       cases: caseResults,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { Mesh, Program, Renderer, Triangle } from "ogl";
 
 const vertex = `attribute vec2 position; varying vec2 vUv; void main(){ vUv=position*.5+.5; gl_Position=vec4(position,0.,1.); }`;
@@ -36,6 +37,8 @@ void main(){
 
 export default function GradientWaves() {
   const host = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+  const isDataSurface = pathname === '/dashboard';
 
   useEffect(() => {
     const element = host.current;
@@ -92,5 +95,5 @@ export default function GradientWaves() {
     }
   }, []);
 
-  return <div ref={host} className="gradient-waves" aria-hidden="true" />;
+  return <div ref={host} className={`gradient-waves ${isDataSurface ? 'gradient-waves--data' : ''}`} aria-hidden="true" />;
 }

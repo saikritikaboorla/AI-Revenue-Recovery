@@ -1,5 +1,6 @@
 import { db, RecoveryCaseRecord, AuditRecord, RecoveryLedgerRecord, EscalationRecord } from '../db';
 import { PlaybookType, PLAYBOOK_CONFIGS } from './index';
+import { createAIDecision } from '../ai-decision';
 
 export interface ExecutionResult {
   success: boolean;
@@ -52,6 +53,9 @@ export class RecoveryPipeline {
 
     const guardrails = db.getGuardrails();
     const config = PLAYBOOK_CONFIGS[recCase.playbook];
+    const customer = db.getCustomerById(recCase.customer_id);
+    const aiDecision = createAIDecision(recCase, guardrails, customer);
+    recCase.ai_decision = aiDecision;
 
     // Stage 0: Record DETECT if not present
     const existingAudits = db.getAuditsByCaseId(caseId);
@@ -100,6 +104,19 @@ export class RecoveryPipeline {
     };
     db.addAudit(diagAudit);
     generatedAudits.push(diagAudit);
+
+    db.addAudit({
+      id: `aud_${recCase.id}_dec_${Date.now()}`,
+      case_id: recCase.id,
+      timestamp: aiDecision.timestamp,
+      stage: 'DECIDE_PLAYBOOK',
+      actor: 'RECOVER_AI_DECISION_SERVICE',
+      action: 'STRUCTURED_PLAYBOOK_DECISION',
+      result: aiDecision.escalationRequired ? 'ESCALATED' : 'SUCCESS',
+      details: `${aiDecision.detectedIssue}. ${aiDecision.expectedOutcome}`,
+      metadata: { aiDecision },
+    });
+    generatedAudits.push(db.getAuditsByCaseId(caseId).slice(-1)[0]);
 
     // Stage 2: DECIDE PLAYBOOK & CHECK GUARDRAILS
     recCase.status = 'DECIDED';
@@ -169,7 +186,9 @@ export class RecoveryPipeline {
     recCase.current_step = 'EXECUTE_ACTION';
     recCase.retry_count += 1;
 
-    const action = config.allowedActions[0] || 'smart_retry_payment';
+    const action = aiDecision.selectedAction === 'human_review'
+      ? (config.allowedActions[0] || 'smart_retry_payment')
+      : aiDecision.selectedAction;
     recCase.last_action = action;
 
     const actAudit: AuditRecord = {

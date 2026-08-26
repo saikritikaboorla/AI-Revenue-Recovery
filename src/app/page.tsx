@@ -145,9 +145,9 @@ export default function LandingPage() {
   const [metrics, setMetrics]   = useState<Metrics | null>(null);
   const [metricsFetching, setMetricsFetching] = useState(true);
 
-  // Reveal as soon as the initial application shell has had time to hydrate.
+  // Reveal after the shell has hydrated; the screen is an initialization cue, not a gate.
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 2200);
+    const t = setTimeout(() => setLoading(false), 1300);
     return () => clearTimeout(t);
   }, []);
 
@@ -244,7 +244,7 @@ export default function LandingPage() {
 
           {/* Separate text blocks keep the product proposition editorial and readable. */}
           <p className="text-base sm:text-lg md:text-xl text-[#D7E2F2] font-normal max-w-3xl mx-auto leading-[1.8] tracking-[0.01em] mb-5">
-            An autonomous AI agent that detects revenue at risk, diagnoses the cause, selects the right recovery playbook, and executes bounded recovery actions.
+            An autonomous closed-loop AI agent that detects revenue at risk, diagnoses the cause, selects the optimal recovery playbook, executes bounded actions, verifies settlement, and records every recovered rupee.
           </p>
 
           {/* Supporting Trust Line */}
@@ -354,7 +354,7 @@ export default function LandingPage() {
                 Autonomous Pipeline
               </p>
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#F0F4FF] tracking-tight mb-4">
-                Detect → Diagnose → Act → Verify → Measure
+                Detect → Diagnose → Decide → Act → Verify
               </h2>
               <p className="text-base text-[#6B7FA3] leading-relaxed">
                 A stateful revenue-operations engine. Every stage is immutably logged with

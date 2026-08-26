@@ -1,0 +1,14 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { CheckCircle2, X, Loader2, ArrowRight, ShieldCheck } from 'lucide-react';
+
+type Entry = { id: string; case_id: string; amount_at_risk: number; recovered_amount: number; playbook: string; verification_source: string; verified_at: string };
+const money = (value: number) => `₹${Number(value || 0).toLocaleString('en-IN')}`;
+
+export function LedgerProofModal({ onClose }: { onClose: () => void }) {
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { fetch('/api/ledger', { cache: 'no-store' }).then(response => response.json()).then(data => setEntries(data.entries || [])).finally(() => setLoading(false)); }, []);
+  return <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4 backdrop-blur-md" onClick={event => event.target === event.currentTarget && onClose()}><section className="mx-auto my-8 max-w-4xl rounded-3xl border border-emerald-400/30 bg-[#0b111d] shadow-2xl"><header className="flex items-center justify-between border-b border-[#26374d] px-6 py-5"><div><p className="text-xs font-mono uppercase tracking-[.2em] text-emerald-300">Recovery Ledger Proof</p><h2 className="mt-1 text-2xl font-extrabold text-white">Every recovered rupee has a settlement trail</h2></div><button onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-white/5 hover:text-white"><X /></button></header><div className="p-6"><div className="mb-5 flex flex-wrap gap-2 text-xs text-slate-400"><span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-emerald-200"><CheckCircle2 className="mr-1 inline h-3.5 w-3.5" />{entries.length} successful recoveries</span><span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-cyan-200"><ShieldCheck className="mr-1 inline h-3.5 w-3.5" />Verified provider events only</span></div>{loading ? <div className="grid h-40 place-items-center"><Loader2 className="animate-spin text-emerald-300" /></div> : <div className="space-y-3">{entries.map(entry => <div key={entry.id} className="rounded-2xl border border-[#26374d] bg-[#101927] p-4"><div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-white"><span className="font-mono text-cyan-200">{entry.case_id}</span><ArrowRight className="h-4 w-4 text-slate-600" /><span className="text-blue-200">{entry.playbook.replace(/_/g, ' ')}</span><ArrowRight className="h-4 w-4 text-slate-600" /><span className="text-emerald-200">{money(entry.recovered_amount)} settled</span></div><div className="mt-3 grid gap-2 text-xs text-slate-400 sm:grid-cols-3"><span>Action → provider result</span><span>Verification: {entry.verification_source}</span><span>Ledger {entry.id} · {new Date(entry.verified_at).toLocaleString('en-IN')}</span></div></div>)}</div>}</div></section></div>;
+}

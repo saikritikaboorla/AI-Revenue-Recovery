@@ -14,6 +14,7 @@ import {
 interface MetricsOverviewProps {
   metrics: any;
   loading: boolean;
+  onVerifiedClick?: () => void;
 }
 
 /* ─── Shimmer skeleton card ─── */
@@ -35,7 +36,7 @@ const SkeletonCard: React.FC = () => (
 );
 
 /* ─── Main component ─── */
-export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loading }) => {
+export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loading, onVerifiedClick }) => {
   /* ── Loading state: 7 shimmer cards ── */
   if (loading || !metrics) {
     return (
@@ -163,8 +164,11 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
       {cards.map((card) => {
         const Icon = card.icon;
         return (
-          <div
+          <button
             key={card.id}
+            type="button"
+            onClick={card.id === 'recovered' ? onVerifiedClick : undefined}
+            aria-label={card.id === 'recovered' ? 'Open verified recovery proof' : undefined}
             className={`
               metric-card relative min-h-36 overflow-hidden rounded-2xl border bg-[#141A24]/90
               p-5 flex flex-col justify-between
@@ -203,7 +207,7 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
                 {card.subtitle}
               </div>
             </div>
-          </div>
+          </button>
         );
       })}
     </div>

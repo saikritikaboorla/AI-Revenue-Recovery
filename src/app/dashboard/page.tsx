@@ -11,6 +11,7 @@ import { GuardrailSettingsView } from '@/components/GuardrailSettingsView';
 import { AuditTrailView } from '@/components/AuditTrailView';
 import { EscalationsView } from '@/components/EscalationsView';
 import { PromiseToPay } from '@/components/PromiseToPay';
+import { LedgerProofModal } from '@/components/LedgerProofModal';
 import {
   ShieldCheck,
   RefreshCw,
@@ -110,6 +111,7 @@ export default function DashboardPage() {
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
+  const [showLedgerProof, setShowLedgerProof] = useState(false);
 
   // Guard against double-init in Strict Mode
   const fetchedRef = useRef(false);
@@ -258,7 +260,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Metrics Overview ──────────────────────────────────────────── */}
-        <MetricsOverview metrics={metrics} loading={loading} />
+        <MetricsOverview metrics={metrics} loading={loading} onVerifiedClick={() => setShowLedgerProof(true)} />
 
         {/* ── Tab Bar ───────────────────────────────────────────────────── */}
         <div className="module-tabs flex flex-wrap gap-2 border-b border-[#252D3A] pb-3" aria-label="Command center modules">
@@ -342,6 +344,8 @@ export default function DashboardPage() {
           isProcessing={processingId === selectedCaseId}
         />
       )}
+
+      {showLedgerProof && <LedgerProofModal onClose={() => setShowLedgerProof(false)} />}
 
       {/* ── Toast Notifications ────────────────────────────────────────── */}
       <Toast toasts={toasts} onDismiss={dismissToast} />

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { BatchSimulationResult } from '@/lib/simulation-engine';
 import {
   PlayCircle,
   CheckCircle2,
@@ -22,10 +21,13 @@ interface SimulateApiResult {
   batchId: string;
   totalProcessed?: number;
   totalCasesGenerated?: number;
+  recoveredCount?: number;
   totalAtRisk?: number;
   totalValueAtRisk?: number;
   totalRecovered?: number;
   totalValueRecovered?: number;
+  predictedRecoverableValue?: number;
+  verifiedRecoveredValue?: number;
   recoveryRatePct: number;
   escalatedCount: number;
   playbookDistribution?: Record<string, number>;
@@ -34,7 +36,9 @@ interface SimulateApiResult {
   totalRecoverableValue?: number;
   successfulRecoveriesCount?: number;
   stoppedCount?: number;
-  caseResults?: unknown[];
+  decisionDistribution?: Record<string, number>;
+  decisionFactors?: Record<string, number>;
+  cases?: Array<{ id: string; customerName: string; amount: number; playbook: string; status: string; recoveredAmount: number; predictedRecoverable: number }>;
 }
 
 interface SimulationRunnerProps {
@@ -201,6 +205,11 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
   const totalCases  = lastResult ? (lastResult.totalProcessed   ?? lastResult.totalCasesGenerated   ?? 0) : 0;
   const latencyMs   = lastResult?.averageExecutionLatencyMs ?? null;
   const playbookDist = lastResult?.playbookDistribution ?? null;
+  const predicted = lastResult ? (lastResult.predictedRecoverableValue ?? 0) : 0;
+  const stopped = lastResult?.stoppedCount ?? 0;
+  const successful = lastResult?.recoveredCount ?? 0;
+  const decisionDistribution = lastResult?.decisionDistribution ?? {};
+  const decisionFactors = lastResult?.decisionFactors ?? {};
 
   return (
     <div className="rounded-xl border border-[#252D3A] bg-[#141A24] p-6 shadow-xl space-y-6">
@@ -380,7 +389,7 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
           </div>
 
           {/* Metric cards grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {/* At Risk */}
             <div className="rounded-lg bg-[#10151F] border border-[#252D3A] p-3 space-y-0.5">
               <span className="text-[10px] uppercase tracking-wider text-[#98A2B3] flex items-center gap-1">
@@ -397,6 +406,11 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
                 Recovered
               </span>
               <p className="text-base font-bold text-emerald-400">{formatINR(recovered)}</p>
+            </div>
+
+            <div className="rounded-lg bg-[#10151F] border border-purple-900/40 p-3 space-y-0.5">
+              <span className="text-[10px] uppercase tracking-wider text-[#98A2B3]">Predicted Recoverable</span>
+              <p className="text-base font-bold text-purple-300">{formatINR(predicted)}</p>
             </div>
 
             {/* Recovery Rate */}
@@ -416,7 +430,20 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
               </span>
               <p className="text-base font-bold text-cyan-400">{lastResult.escalatedCount} cases</p>
             </div>
+            <div className="rounded-lg bg-[#10151F] border border-rose-900/30 p-3 space-y-0.5">
+              <span className="text-[10px] uppercase tracking-wider text-[#98A2B3]">Stopped / Successful</span>
+              <p className="text-base font-bold text-rose-300">{stopped} / {successful}</p>
+            </div>
           </div>
+
+          {lastResult.cases && lastResult.cases.length > 0 && (
+            <div className="rounded-xl border border-[#252D3A] bg-[#10151F] p-4">
+              <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#98A2B3]">Underlying cases · action → settlement</h4>
+              <div className="max-h-64 space-y-2 overflow-y-auto">{lastResult.cases.map(result => <div key={result.id} className="grid gap-1 rounded-lg border border-[#252D3A] bg-[#141A24] p-3 text-xs sm:grid-cols-[1.2fr_1fr_auto_auto]"><span className="font-mono text-cyan-300">{result.id}<span className="ml-2 font-sans text-slate-400">{result.customerName}</span></span><span className="text-slate-400">{result.playbook.replace(/_/g, ' ')}</span><span className={result.recoveredAmount > 0 ? 'text-emerald-300' : 'text-amber-300'}>{result.recoveredAmount > 0 ? `Verified ${formatINR(result.recoveredAmount)}` : result.status.replace(/_/g, ' ')}</span><span className="text-right text-purple-300">Forecast {formatINR(result.predictedRecoverable)}</span></div>)}</div>
+            </div>
+          )}
+
+          {Object.keys(decisionDistribution).length > 0 && <div className="grid gap-4 lg:grid-cols-2"><div className="rounded-xl border border-purple-500/25 bg-purple-500/5 p-4"><h4 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-purple-200">AI decision distribution</h4><div className="space-y-2">{Object.entries(decisionDistribution).map(([decision, count]) => <div key={decision} className="flex items-center justify-between rounded-lg border border-purple-500/15 bg-[#10151F] px-3 py-2 text-xs"><span className="text-slate-300">{decision.replace(/_/g, ' ')}</span><strong className="font-mono text-purple-200">{count}</strong></div>)}</div></div><div className="rounded-xl border border-blue-500/25 bg-blue-500/5 p-4"><h4 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-blue-200">Why? aggregate positive signals</h4><div className="space-y-2">{Object.entries(decisionFactors).map(([factor, count]) => <div key={factor} className="flex items-center justify-between rounded-lg border border-blue-500/15 bg-[#10151F] px-3 py-2 text-xs"><span className="text-slate-300">{factor}</span><span className="font-mono text-blue-200">{count}/{totalCases}</span></div>)}</div></div></div>}
 
           {/* Avg Latency full-width card (if not already shown in header) */}
           {latencyMs !== null && (

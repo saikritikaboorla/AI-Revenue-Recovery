@@ -16,7 +16,7 @@ import {
   LineChart,
   Line,
 } from 'recharts';
-import { BarChart3, TrendingUp, AlertTriangle, CheckCircle2, Clock, Activity } from 'lucide-react';
+import { BarChart3, TrendingUp, AlertTriangle, CheckCircle2, Clock, Activity, BrainCircuit, ChevronDown } from 'lucide-react';
 
 interface RecoveryChartsProps {
   metrics: any;
@@ -58,6 +58,25 @@ function SummaryCard({
     </div>
   );
 }
+
+function AIAnalysisSection({ playbookData, atRisk, recovered, rate, escalated, active, total, ledger }: { playbookData: Array<{ fullName: string; atRisk: number; recovered: number; rate: number; count: number }>; atRisk: number; recovered: number; rate: number; escalated: number; active: number; total: number; ledger: number }) {
+  const largestExposure = playbookData.reduce((largest, current) => current.atRisk > largest.atRisk ? current : largest, { fullName: 'No playbook data', atRisk: 0, recovered: 0, rate: 0, count: 0 });
+  const strongestPlaybook = playbookData.filter(item => item.count > 0).sort((a, b) => b.rate - a.rate)[0];
+  const exposureShare = atRisk > 0 ? Math.round((largestExposure.atRisk / atRisk) * 100) : 0;
+  const cards = [
+    { title: 'Exposure concentration', label: 'AT-RISK ANALYSIS', color: 'amber', icon: AlertTriangle, summary: largestExposure.atRisk ? `${largestExposure.fullName} carries the largest exposure.` : 'Waiting for case data.', body: largestExposure.atRisk ? `${largestExposure.fullName} represents ${exposureShare}% of all revenue at risk (${money(largestExposure.atRisk)} across ${largestExposure.count} cases). This is the first playbook the agent should inspect for additional recoverable value.` : 'Run a batch or load cases to calculate exposure concentration from the backend metrics.' },
+    { title: 'Verified recovery signal', label: 'SETTLEMENT ANALYSIS', color: 'emerald', icon: CheckCircle2, summary: `${money(recovered)} verified across ${ledger} ledger entries.`, body: `The recovery rate is ${rate.toFixed(1)}% of revenue at risk. This card uses only the recovery ledger total exposed by the metrics API; it does not treat predicted recovery as cash recovered.` },
+    { title: 'Playbook performance', label: 'DECISION ANALYSIS', color: 'purple', icon: BrainCircuit, summary: strongestPlaybook ? `${strongestPlaybook.fullName} leads at ${strongestPlaybook.rate.toFixed(1)}%.` : 'No completed playbooks yet.', body: strongestPlaybook ? `Among playbooks with cases, ${strongestPlaybook.fullName} has the highest verified recovery rate (${strongestPlaybook.recovered.toLocaleString('en-IN')} recovered from ${strongestPlaybook.atRisk.toLocaleString('en-IN')} at risk). Rates are calculated from persisted case and ledger metrics.` : 'Once cases have verified outcomes, the strongest playbook is calculated from actual recovered amounts.' },
+    { title: 'Human attention queue', label: 'GUARDRAIL ANALYSIS', color: 'red', icon: ShieldIcon, summary: `${escalated} escalated · ${active} active · ${total} total cases.`, body: escalated ? `${escalated} case${escalated === 1 ? '' : 's'} require human review under the current guardrail state. Active cases remain in the bounded workflow and are not counted as recovered until settlement verification.` : 'No cases are currently escalated. Active workflows remain subject to retry, risk, amount, cooldown, and stopping rules.' },
+  ];
+  const surfaces: Record<string, string> = { amber: 'border-amber-400/25 bg-amber-400/5 open:bg-amber-400/10', emerald: 'border-emerald-400/25 bg-emerald-400/5 open:bg-emerald-400/10', purple: 'border-purple-400/25 bg-purple-400/5 open:bg-purple-400/10', red: 'border-rose-400/25 bg-rose-400/5 open:bg-rose-400/10' };
+  const accents: Record<string, string> = { amber: 'text-amber-300', emerald: 'text-emerald-300', purple: 'text-purple-300', red: 'text-rose-300' };
+  return <section className="rounded-2xl border border-purple-500/25 bg-gradient-to-br from-purple-500/5 via-[#141A24] to-blue-500/5 p-5 shadow-[0_20px_45px_rgba(0,0,0,.18)]"><div className="mb-4 flex items-start gap-3"><div className="rounded-xl border border-purple-400/30 bg-purple-400/10 p-2 text-purple-200"><BrainCircuit className="h-5 w-5" /></div><div><p className="text-[11px] font-mono uppercase tracking-[.18em] text-purple-200">AI Analysis · Live metrics</p><h3 className="mt-1 text-lg font-bold text-white">What the recovery data is telling the agent</h3><p className="mt-1 text-sm text-slate-400">Deterministic explainability summaries derived from current playbook, case, and ledger results.</p></div></div><div className="grid gap-3 md:grid-cols-2">{cards.map(card => <details key={card.title} className={`group rounded-xl border ${surfaces[card.color]}`}><summary className="flex cursor-pointer list-none items-center gap-3 p-4"><card.icon className={`h-5 w-5 shrink-0 ${accents[card.color]}`} /><span className="min-w-0 flex-1"><span className={`block text-[10px] font-bold uppercase tracking-wider ${accents[card.color]}`}>{card.label}</span><span className="mt-1 block text-sm font-semibold text-white">{card.title}</span></span><ChevronDown className="h-4 w-4 text-slate-500 transition-transform group-open:rotate-180" /></summary><div className="border-t border-white/10 px-4 pb-4 pt-3"><p className="text-sm font-semibold text-slate-200">{card.summary}</p><p className="mt-2 text-xs leading-relaxed text-slate-400">{card.body}</p></div></details>)}</div></section>;
+}
+
+function ShieldIcon(props: { className?: string }) { return <AlertTriangle {...props} />; }
+
+function money(value: number) { return `₹${Number(value || 0).toLocaleString('en-IN')}`; }
 
 // Custom tooltip
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -195,6 +214,8 @@ export const RecoveryCharts: React.FC<RecoveryChartsProps> = ({ metrics, loading
           iconCls="text-cyan-400"
         />
       </div>
+
+      <AIAnalysisSection playbookData={playbookData} atRisk={atRisk} recovered={recovered} rate={rate} escalated={escalated} active={active} total={total} ledger={ledger} />
 
       {/* ── Playbook Revenue Charts ────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

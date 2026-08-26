@@ -9,7 +9,7 @@ const STAGES = [
   { at: 420, progress: 38, label: 'Loading recovery intelligence...' },
   { at: 900, progress: 63, label: 'Connecting recovery pipeline...' },
   { at: 1380, progress: 82, label: 'Verifying guardrails...' },
-  { at: 1840, progress: 92, label: 'Preparing command center...' },
+  { at: 1200, progress: 92, label: 'Preparing command center...' },
 ] as const;
 
 export const LoadingScreen: React.FC<LoadingScreenProps> = ({ loading }) => {

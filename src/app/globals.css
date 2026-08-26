@@ -97,6 +97,9 @@ body {
 }
 .gradient-waves canvas { position: relative; z-index: 1; display: block; width: 100%; height: 100%; opacity: .86; }
 .gradient-waves--fallback canvas { display: none; }
+.gradient-waves--data::before { opacity: .28; }
+.gradient-waves--data::after { background: linear-gradient(180deg, rgba(3,8,19,.48), rgba(3,8,19,.76) 67%, rgba(3,8,19,.9)); }
+.gradient-waves--data canvas { opacity: .34; }
 .app-chrome { position: relative; z-index: 1; min-height: 100vh; }
 
 .command-header { position: relative; padding: 1.35rem; border-radius: 1.25rem; background: linear-gradient(115deg, rgba(9,18,35,.87), rgba(8,17,31,.70)); backdrop-filter: blur(18px); box-shadow: 0 20px 55px rgba(0,0,0,.20); }

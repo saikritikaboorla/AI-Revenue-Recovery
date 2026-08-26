@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { PlaybookType, PLAYBOOK_CONFIGS } from '../playbooks';
+import type { AIDecisionRecord } from '../ai-decision';
 
 export interface CustomerRecord {
   id: string;
@@ -42,6 +43,7 @@ export interface RecoveryCaseRecord {
   created_at: string;
   updated_at: string;
   recovered_at?: string;
+  ai_decision?: AIDecisionRecord;
 }
 
 export interface RecoveryLedgerRecord {
@@ -66,6 +68,7 @@ export interface AuditRecord {
   action: string;
   result: 'SUCCESS' | 'FAILED' | 'ESCALATED' | 'BLOCKED';
   details: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface EscalationRecord {
@@ -446,7 +449,12 @@ export class DatabaseService {
   }
 
   public getLedgerEntries(): RecoveryLedgerRecord[] {
-    return Array.from(this.ledger.values());
+    return Array.from(this.ledger.values()).sort((a, b) => new Date(b.verified_at).getTime() - new Date(a.verified_at).getTime());
+  }
+
+  public getLedgerEntriesByCaseId(caseId?: string): RecoveryLedgerRecord[] {
+    const entries = this.getLedgerEntries();
+    return caseId ? entries.filter(entry => entry.case_id === caseId) : entries;
   }
 
   public resolveEscalation(caseId: string, status: 'APPROVED' | 'REJECTED'): void {
