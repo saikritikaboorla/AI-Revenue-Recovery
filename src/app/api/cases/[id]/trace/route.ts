@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { PLAYBOOK_CONFIGS } from '@/lib/playbooks';
 import { createAIDecision } from '@/lib/ai-decision';
+import { evaluateGuardrails } from '@/lib/guardrails';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,22 +39,9 @@ export async function GET(
   const audits = db.getAuditsByCaseId(id);
 
   // Real guardrail check evaluation
-  const retryLimitPassed = recCase.retry_count < (config?.maxRetries || guardrails.maxRetries);
-  const riskThresholdPassed = recCase.customer_risk_score <= guardrails.maxRiskScoreForAutonomousAction;
-  const valueCeilingPassed = recCase.amount <= guardrails.highValueThreshold;
-
-  const guardrailChecks = {
-    maxRetriesUnderLimit: retryLimitPassed,
-    retryCount: recCase.retry_count,
-    maxRetriesAllowed: config?.maxRetries || guardrails.maxRetries,
-    customerRiskScore: recCase.customer_risk_score,
-    maxRiskScoreAllowed: guardrails.maxRiskScoreForAutonomousAction,
-    riskScoreApproved: riskThresholdPassed,
-    amount: recCase.amount,
-    highValueThreshold: guardrails.highValueThreshold,
-    valueApproved: valueCeilingPassed,
-    overallGuardrailPassed: retryLimitPassed && riskThresholdPassed && valueCeilingPassed,
-  };
+  const maxRetries = config?.maxRetries || guardrails.maxRetries;
+  const guardrailChecks = evaluateGuardrails(recCase, guardrails, maxRetries);
+  const retryLimitPassed = guardrailChecks.maxRetriesUnderLimit;
 
   // Structured Decision Factors derived from real record attributes
   const factors = [
@@ -73,7 +61,7 @@ export async function GET(
       factor: 'Playbook Retry Headroom',
       impact: retryLimitPassed ? 'POSITIVE' : 'NEGATIVE',
       weight: 0.30,
-      description: `Attempt ${recCase.retry_count} of ${config?.maxRetries || guardrails.maxRetries} maximum allowed retries.`
+      description: `Attempt ${recCase.retry_count} of ${maxRetries} maximum allowed retries.`
     }
   ];
 
@@ -92,7 +80,7 @@ export async function GET(
       segment: recCase.customer_segment,
       riskScore: recCase.customer_risk_score,
       retryCount: recCase.retry_count,
-      maxRetries: config?.maxRetries || guardrails.maxRetries,
+      maxRetries,
       pastRecoverySignal: `Historical segment and risk signals used; current case confidence ${recCase.recovery_confidence}%.`,
     },
     ledgerEntries,

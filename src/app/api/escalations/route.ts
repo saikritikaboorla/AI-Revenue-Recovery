@@ -1,11 +1,21 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { RecoveryPipeline } from '@/lib/playbooks/engine';
+import { PLAYBOOK_CONFIGS } from '@/lib/playbooks';
+import { evaluateGuardrails, getGuardrailTrigger } from '@/lib/guardrails';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const escalations = db.getEscalations();
+  const escalations = db.getEscalations().map(escalation => {
+    const recCase = db.getCaseById(escalation.case_id);
+    if (!recCase) return escalation;
+    const guardrails = db.getGuardrails();
+    const maxRetries = PLAYBOOK_CONFIGS[recCase.playbook]?.maxRetries || guardrails.maxRetries;
+    const trigger = getGuardrailTrigger(evaluateGuardrails(recCase, guardrails, maxRetries));
+    // Older seed rows contain a generic reason; current guardrail results are authoritative.
+    return trigger ? { ...escalation, reason: trigger } : escalation;
+  });
   return NextResponse.json({ escalations, total: escalations.length });
 }
 

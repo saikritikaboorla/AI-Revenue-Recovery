@@ -212,7 +212,6 @@ export class SimulationEngine {
    */
   public static async runBatchSimulation(config: BatchSimulationConfig): Promise<BatchSimulationResult> {
     const count = Math.min(Math.max(config.batchSize || 5, 1), 100);
-    const startMs = Date.now();
     const batchId = `BATCH-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
 
     // Generate all cases upfront
@@ -232,13 +231,18 @@ export class SimulationEngine {
     const decisionDistribution: Record<string, number> = {};
     const decisionFactors: Record<string, number> = {};
     const caseResults: BatchSimulationResult['cases'] = [];
+    let totalExecutionMs = 0;
+    let executedCaseCount = 0;
 
     for (const recCase of generatedCases) {
       totalValueAtRisk += recCase.amount;
       predictedRecoverableValue += Math.round(recCase.amount * recCase.recovery_confidence / 100);
 
       if (config.autonomousAutoExecute !== false) {
+        const caseStartMs = performance.now();
         const res = await RecoveryPipeline.processCase(recCase.id);
+        totalExecutionMs += performance.now() - caseStartMs;
+        executedCaseCount += 1;
 
         if (res.recovered) {
           const recAmt = res.case.recovered_amount || recCase.amount;
@@ -285,7 +289,6 @@ export class SimulationEngine {
       }
     }
 
-    const durationMs = Date.now() - startMs;
     const recoveryRatePct = totalValueAtRisk > 0
       ? Number(((totalValueRecovered / totalValueAtRisk) * 100).toFixed(1))
       : 0;
@@ -304,7 +307,9 @@ export class SimulationEngine {
       decisionDistribution,
       decisionFactors,
       recoveryRatePct,
-      averageExecutionLatencyMs: count > 0 ? Math.round(durationMs / count) : 0,
+      averageExecutionLatencyMs: executedCaseCount > 0
+        ? Number((totalExecutionMs / executedCaseCount).toFixed(2))
+        : 0,
       cases: caseResults,
     };
   }
