@@ -34,7 +34,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Overview',        href: '/',                     icon: Layers },
-  { label: 'Command Center',  href: '/dashboard',            icon: Activity },
+  { label: 'Command Center',  href: '/dashboard',            icon: Activity,      hash: 'overview' },
   { label: 'Recovery Queue',  href: '/dashboard#queue',      icon: Radio,         hash: 'queue' },
   { label: 'Analytics',       href: '/dashboard#analytics',  icon: BarChart3,     hash: 'analytics' },
   { label: 'Batch Simulator', href: '/dashboard#simulation', icon: PlayCircle,    hash: 'simulation' },
@@ -50,10 +50,10 @@ function useHash(): string {
   const [hash, setHash] = useState('');
 
   useEffect(() => {
-    setHash(window.location.hash.replace('#', ''));
-    const onHashChange = () => setHash(window.location.hash.replace('#', ''));
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
+    const updateHash = () => setHash(window.location.hash.replace('#', ''));
+    updateHash();
+    window.addEventListener('hashchange', updateHash);
+    return () => window.removeEventListener('hashchange', updateHash);
   }, []);
 
   return hash;
@@ -62,11 +62,13 @@ function useHash(): string {
 // ─── Active-state helper ──────────────────────────────────────────────────────
 
 function isItemActive(item: NavItem, pathname: string, hash: string): boolean {
-  if (item.hash) {
-    return pathname === '/dashboard' && hash === item.hash;
+  if (pathname === '/') return item.href === '/';
+  if (pathname === '/dashboard') {
+    if (!hash || hash === 'overview') {
+      return item.hash === 'overview' || item.label === 'Command Center';
+    }
+    return item.hash === hash;
   }
-  if (item.href === '/') return pathname === '/';
-  if (item.href === '/dashboard') return pathname === '/dashboard' && !hash;
   return false;
 }
 
@@ -89,32 +91,31 @@ export const Navbar: React.FC = () => {
     return () => { document.body.style.overflow = ''; };
   }, [mobileOpen]);
 
-  /**
-   * Handle nav item click.
-   *
-   * For hash-based dashboard tabs:
-   *   • If we're already on /dashboard, just update window.location.hash
-   *     directly — this fires a hashchange event that the dashboard listens
-   *     to, WITHOUT causing a full Next.js page navigation / component remount.
-   *   • If we're NOT on /dashboard yet, do a full router.push so we land on
-   *     /dashboard first, then the hash syncs on mount.
-   *
-   * For plain routes (/ or /dashboard with no hash), use router.push normally.
-   */
   const handleNavClick = useCallback(
     (e: React.MouseEvent, item: NavItem) => {
-      if (item.hash) {
-        e.preventDefault();
-        if (pathname === '/dashboard') {
-          // Same-page hash switch — no remount, just fire hashchange
-          window.location.hash = item.hash;
-        } else {
-          // Cross-page: navigate to /dashboard then the hash effect syncs on mount
-          router.push(`/dashboard#${item.hash}`);
-        }
-        setMobileOpen(false);
+      if (item.href === '/') {
+        // Normal link navigation to home
+        return;
       }
-      // For non-hash items, let the Link component handle it normally
+
+      e.preventDefault();
+      const targetHash = item.hash || '';
+
+      if (pathname === '/dashboard') {
+        if (!targetHash || targetHash === 'overview') {
+          // Reset hash to overview or clear it
+          window.location.hash = 'overview';
+        } else {
+          window.location.hash = targetHash;
+        }
+      } else {
+        if (!targetHash || targetHash === 'overview') {
+          router.push('/dashboard#overview');
+        } else {
+          router.push(`/dashboard#${targetHash}`);
+        }
+      }
+      setMobileOpen(false);
     },
     [pathname, router]
   );

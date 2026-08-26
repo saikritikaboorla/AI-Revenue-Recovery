@@ -1,201 +1,241 @@
-# AI Revenue Recovery
+# RecoverAI — AI Revenue Recovery
 
-**Find revenue that's slipping away — and win it back, automatically.**
+**Find revenue that's slipping away and win it back, automatically.**
 
-AI Revenue Recovery is an agentic system that watches your payment, checkout, and
-receivables data in real time, figures out *why* money is at risk, decides the
-right way to intervene, and runs a bounded recovery workflow — with a full audit
-trail of every action it took and every dollar it recovered.
+RecoverAI is an agentic system that watches your payment and receivables data, figures out *why* money is at risk, selects the right intervention from a bounded playbook set, executes a recovery workflow, and writes an immutable audit trail of every action and every rupee recovered.
 
-> **Status:** Prototype / Hackathon build. Not production-hardened. See
-> [Known Limitations](#known-limitations) before connecting real payment data.
+> **Status:** Prototype / Hackathon build. Uses a Razorpay mock adapter by default — no live payment credentials required to run.
 
 ---
 
 ## Table of Contents
 
-1. [What This Actually Does](#what-this-actually-does)
-2. [Why This Exists](#why-this-exists)
-3. [How It Works (The Loop)](#how-it-works-the-loop)
-4. [Recovery Playbooks](#recovery-playbooks)
-5. [Tech Stack](#tech-stack)
-6. [Architecture](#architecture)
-7. [Project Structure](#project-structure)
-8. [Getting Started](#getting-started)
-9. [CLI Reference](#cli-reference)
-10. [Environment Variables](#environment-variables)
-11. [Data Model & Audit Trail](#data-model--audit-trail)
-12. [Guardrails, Stopping Rules & Compliance](#guardrails-stopping-rules--compliance)
-13. [Metrics Dashboard](#metrics-dashboard)
-14. [Known Limitations](#known-limitations)
-15. [Roadmap](#roadmap)
+1. [What This Does](#what-this-does)
+2. [How It Works — The Loop](#how-it-works--the-loop)
+3. [Recovery Playbooks](#recovery-playbooks)
+4. [Tech Stack](#tech-stack)
+5. [Architecture](#architecture)
+6. [Project Structure](#project-structure)
+7. [Getting Started](#getting-started)
+8. [Environment Variables](#environment-variables)
+9. [API Routes](#api-routes)
+10. [Data Model](#data-model)
+11. [Guardrails & Stopping Rules](#guardrails--stopping-rules)
+12. [Dashboard Views](#dashboard-views)
+13. [Known Limitations](#known-limitations)
+14. [Roadmap](#roadmap)
 
 ---
 
-## What This Actually Does
+## What This Does
 
-In plain terms: this is a website + background agent that sits on top of your
-payments stack (Stripe/Razorpay-style events, checkout sessions, and invoices)
-and does three jobs a human revenue-ops team would otherwise do manually:
+RecoverAI is a Next.js 16 web app and autonomous agent that does three things a revenue-ops team would otherwise do manually:
 
-1. **Detects** revenue at risk — a card decline, an abandoned checkout, a
-   subscription that failed to renew, an invoice going overdue.
-2. **Diagnoses** the root cause — insufficient funds vs. expired card vs.
-   bank-side decline vs. a UX drop-off vs. a customer who's just late.
-3. **Recovers** the money — by picking one intervention from a small, bounded
-   set of allowed actions (retry payment, send a reminder, offer a grace
-   period, escalate to a human), executing it, and logging exactly what
-   happened so it can be reviewed later.
+1. **Detects** revenue at risk — a failed payment, abandoned checkout, subscription that failed to renew, overdue B2B invoice, or failed e-NACH mandate.
+2. **Diagnoses** the root cause — bank downtime, OTP timeout, mandate limit exceeded, insufficient funds, customer drop-off — and scores recovery confidence.
+3. **Recovers** the money — picks one bounded action (gateway failover, WhatsApp link, IVR call, NACH reschedule, discount offer, or human escalation), executes it through the Razorpay adapter, and logs every step in an append-only audit trail.
 
-The web app is the control tower: a live feed of at-risk revenue, the agent's
-reasoning for each case, the action it took, and a running total of money
-recovered across a batch — plus a manual override/approve button for anything
-above a configurable risk threshold.
+The dashboard is the control tower: live recovery queue, playbook analytics charts, batch simulator, escalation approvals, promise-to-pay tracker, audit log, and configurable guardrail policy — all in a single Next.js app with no separate backend process.
 
 ---
 
-## Why This Exists
-
-Revenue leakage is rarely one clean failure — it's a chain: a payment
-degrades → the customer abandons checkout → the subscription silently lapses
-→ the invoice goes overdue → nobody follows up in time. Today that chain is
-handled by disconnected tools and manual chasing. This prototype closes the
-loop end-to-end: **detect → diagnose → decide → act → verify**, instead of
-just alerting a human and hoping they act on it.
-
----
-
-## How It Works (The Loop)
+## How It Works — The Loop
 
 ```
-   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-   │   DETECT    │ --> │   DIAGNOSE  │ --> │   DECIDE    │ --> │     ACT     │ --> │   VERIFY    │
-   └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
-   Webhook / poll       Root-cause          Pick one action     Execute via         Confirm payment
-   catches a signal:    classification:     from the allowed    provider API /      cleared, log
-   failed charge,       card vs. bank vs.   playbook set,       messaging channel   outcome, update
-   abandoned cart,      UX vs. fraud vs.    respecting risk     (retry, email,      recovered-$
-   overdue invoice,     "customer is        limits + stopping   SMS/WhatsApp,       counter, close
-   failed mandate       just late"          rules               call, escalate)     or retry loop
+EVENT → DETECT → DIAGNOSE → RISK SCORE → SELECT PLAYBOOK → GUARDRAIL CHECK → EXECUTE ACTION → VERIFY → WRITE LEDGER → STOP / ESCALATE
 ```
 
-Every case that enters the loop gets a unique `case_id` and every step above
-is written to the audit log (see [Data Model](#data-model--audit-trail)) — so
-nothing the agent does is a black box.
+Every case that enters the loop gets a unique case ID. Every step above is written to an append-only audit log so nothing the agent does is a black box.
+
+**Nine pipeline stages (as rendered in the landing page):**
+
+| Stage | What Happens |
+|---|---|
+| Detect | Webhook / poll catches a failure or overdue event in real time |
+| Diagnose | Deep contextual reasoning: LTV, error codes, banking latency |
+| Risk Score | Probabilistic recovery confidence with weighted decision factors |
+| Select Playbook | Maps failure signature to the optimal bounded recovery strategy |
+| Guardrail Check | Max-retry, cooldown, contact-cap, and value-threshold gates |
+| Execute Action | WhatsApp link, gateway failover, IVR call, or NACH reschedule |
+| Verify | Razorpay webhook confirms successful settlement |
+| Write Ledger | Immutable append-only entry written to recovery ledger |
+| Measure Recovery | Win-rate, recovered value, and agent attribution updated |
 
 ---
 
 ## Recovery Playbooks
 
-These are the intervention modules included in the prototype. Each is a
-self-contained "if this kind of revenue risk, then this bounded set of
-actions" playbook — the agent picks *one* playbook per case, never invents
-a new action outside it.
+Seven self-contained playbooks. The agent picks exactly one per case and may only call actions within that playbook's `allowedActions` list.
 
-| Playbook | Trigger | Typical Actions |
-|---|---|---|
-| **Payment Degradation → Root Cause → Recovery** | Card decline / failed charge | Classify decline reason → smart retry with backoff, or prompt for updated card |
-| **Checkout Drop-off Recovery** | Cart/checkout session abandoned | Timed nudge (email/SMS), optional incentive, one-click resume link |
-| **Failed-Subscription Recovery** | Recurring billing failure | Dunning sequence (retry schedule), update-payment-method link, grace period |
-| **B2B Receivables Chaser** | Invoice past due date | Staged reminders (polite → firm), escalation to AR team past N days |
-| **Mandate Retry Sequencer** | Failed autopay/eNACH/UPI mandate | Retry within network-allowed windows, fallback to manual payment link |
-| **Hinglish Voice Recovery** | High-value case, no response to text | AI voice call in Hinglish for reminder/payment link, human handoff on request |
-| **Promise-to-Pay Tracker** | Customer commits to a pay date | Track commitment, auto-follow-up if date passes, mark broken promise for escalation |
+| # | Playbook | Trigger Event | Allowed Actions | Max Retries |
+|---|---|---|---|---|
+| 1 | **Payment Degradation & Gateway Failover** | `payment.failed` (bank/gateway timeout) | `switch_gateway_optimizer`, `instant_upi_failover`, `card_network_switch` | 3 |
+| 2 | **Checkout Abandonment Cart Recovery** | `checkout.session_expired_without_auth` | `send_checkout_resume_link`, `apply_instant_settlement_discount`, `whatsapp_quickpay` | 2 |
+| 3 | **Recurring Subscription Invoicing** | `subscription.charge_failed` (mandate limit) | `request_payment_method_update`, `send_afa_authorization_link`, `offer_grace_period` | 3 |
+| 4 | **B2B Overdue Invoices & Receivables** | `invoice.overdue_net30_breached` | `create_payment_link`, `apply_5pct_early_discount`, `escalate_to_relationship_manager` | 2 |
+| 5 | **e-NACH & Mandate Clearing Reschedule** | `mandate.debit_declined_insufficient_funds` | `schedule_morning_batch_retry`, `split_mandate_charge`, `notify_mandate_update` | 3 |
+| 6 | **Hinglish Conversational AI Assist** | `payment.dropped_upi_intent` | `send_hinglish_whatsapp_prompt`, `dispatch_assisted_ivr_call`, `send_upi_intent_qr` | 2 |
+| 7 | **Promise-to-Pay (P2P) Tracker** | `customer.promise_to_pay_created` | `create_promise_to_pay`, `send_milestone_reminder`, `escalate_broken_promise` | 1 |
 
 ---
 
 ## Tech Stack
 
-> **Assumption flagged:** no existing codebase was found in this environment,
-> so the stack below is a recommended, hackathon-appropriate default. Replace
-> this table with your actual stack if it differs — the rest of the doc
-> structure still applies.
+This is what is **actually used** in the codebase — no aspirational stack items.
 
-| Layer | Choice | Why |
+| Layer | What's Used | Details |
 |---|---|---|
-| Frontend | **Next.js (React + TypeScript)**, Tailwind CSS | Fast to build a dashboard + live feed UI; SSR for the control-tower view |
-| Backend API | **Next.js API routes** or a small **Node.js (Express)** service | Webhook ingestion (Stripe/Razorpay), REST endpoints for the dashboard |
-| Agent / Orchestration | **Python** worker service using the **Claude API** (tool use / function calling) | Diagnosis + decision step; Claude picks a playbook and returns a structured action, not free-form text |
-| Task Queue | **Redis + BullMQ** (or Celery if Python-first) | Retry scheduling, dunning sequences, delayed follow-ups |
-| Database | **PostgreSQL** | Cases, audit log, recovered-revenue ledger, promise-to-pay records |
-| Payments | **Stripe** (or Razorpay for India-first flows) webhooks + API | Source of truth for charges, subscriptions, invoices; also used to *execute* retries |
-| Messaging | **Twilio** (SMS/WhatsApp/Voice) or **WhatsApp Business API** | Checkout nudges, dunning messages, Hinglish voice calls |
-| Auth | **NextAuth.js** or **Clerk** | Dashboard login for the ops team reviewing/approving actions |
-| Hosting | **Vercel** (frontend) + **Railway/Render/Fly.io** (worker + Postgres + Redis) | Fastest path for a prototype deploy |
-| Observability | Structured logs to Postgres + optional **Sentry** | Every agent decision is queryable, not just "printed to console" |
+| **Framework** | Next.js 16.3.3 (App Router) | Single monolith — both frontend and all API routes live here. No separate backend process. |
+| **Language** | TypeScript 5 | Strict types throughout (`src/lib/types.ts` defines all domain models) |
+| **React** | React 19.2.8 | All components are Client Components (`"use client"`) |
+| **Styling** | Tailwind CSS v4 + `tailwind-merge` | Dark-mode dashboard with custom CSS variables in `globals.css` |
+| **Animation** | Framer Motion 13 + GSAP 3.15 | Page transitions, micro-interactions, loading screen |
+| **3D / WebGL** | Three.js 0.185 + OGL 1.0 | Galaxy background on landing page (browser-only, `ssr: false`) |
+| **Charts** | Recharts 3.10 | Playbook analytics: bar charts, area charts, pie charts |
+| **Icons** | Lucide React 1.34 | All dashboard icons |
+| **Confetti** | canvas-confetti 1.9 | Recovery celebration effect |
+| **State / Data Store** | In-memory singleton (`DatabaseService`) | No external database. All data lives in server-side Maps seeded from CSV files at startup. |
+| **Seed Data** | CSV files in `data/seed/` | `customers.csv`, `recovery_cases.csv`, `audit_log.csv`, `recovery_ledger.csv`, `escalations.csv`, `promises.csv` |
+| **Payment Adapter** | Razorpay mock adapter (`RazorpayService`) | Falls back to a high-fidelity mock when `RAZORPAY_KEY_ID` is not set. Supports live test mode with real credentials. |
+| **Agent Engine** | `RecoveryAgentEngine` + `RecoveryPipeline` | Pure TypeScript decision engine — no LLM API called at runtime. Uses a deterministic decision matrix keyed on failure reason, customer segment, and guardrail state. |
+| **Simulation Engine** | `SimulationEngine` | Generates synthetic cases (1–100 batch) and runs them through the full pipeline. Probabilistic win/loss outcome. |
+| **Hosting** | Vercel (`.vercel/project.json` present) | `next build` + `next start` or Vercel serverless |
+| **Package Manager** | npm (lockfile version 3) | |
+| **Linter** | ESLint 9 + `eslint-config-next` | |
 
-**Why an agent framework isn't listed separately:** the "agent" here is
-intentionally a *constrained* decision function — Claude is given the case
-data and a fixed menu of allowed tools/actions (retry_payment, send_reminder,
-offer_grace_period, escalate_to_human, etc.) via function calling, and must
-pick from that menu. This keeps the system auditable and bounded rather than
-letting the model free-form its way to arbitrary side effects.
+### Why no LLM / Claude API at runtime?
+
+The agent is intentionally a **constrained decision function**, not a free-form model call. A deterministic decision matrix (`agent-engine.ts`, `playbooks/engine.ts`) maps each combination of failure reason + customer segment + guardrail state to exactly one playbook and one action. This keeps the system:
+
+- **Auditable** — every decision is fully reproducible and explainable without a model trace.
+- **Bounded** — the agent cannot invent actions outside the allowed set.
+- **Zero-latency** — no API round-trip on the critical recovery path.
+- **Demo-safe** — runs fully offline with no external API keys required.
 
 ---
 
 ## Architecture
 
 ```
-                              ┌────────────────────────┐
-                              │   Payment Provider      │
-                              │  (Stripe / Razorpay)    │
-                              └───────────┬─────────────┘
-                                          │ webhooks (charge.failed,
-                                          │ invoice.overdue, checkout.abandoned)
-                                          ▼
-   ┌───────────────┐   enqueue   ┌───────────────────┐   reads/writes   ┌───────────────┐
-   │  Ingestion API │ ─────────> │   Redis Queue      │ ───────────────>│  PostgreSQL    │
-   │ (Next.js route)│            │  (BullMQ jobs)     │                  │  (cases, audit,│
-   └───────────────┘            └─────────┬───────────┘                  │   ledger)      │
-                                            │                              └───────┬───────┘
-                                            ▼                                      │
-                                  ┌───────────────────┐   structured action        │
-                                  │  Agent Worker       │ ──────────────────────────┘
-                                  │  (Python + Claude   │
-                                  │   function calling) │
-                                  └─────────┬───────────┘
-                                            │ executes via allowed tools only
-                          ┌─────────────────┼─────────────────┐
-                          ▼                 ▼                 ▼
-                 ┌────────────────┐ ┌───────────────┐ ┌────────────────┐
-                 │ Payment Retry   │ │ Twilio SMS /   │ │ Escalate to     │
-                 │ (Stripe API)    │ │ WhatsApp / Call│ │ Human (dashboard)│
-                 └────────────────┘ └───────────────┘ └────────────────┘
-                                            │
-                                            ▼
-                                  ┌───────────────────┐
-                                  │  Dashboard (Next.js)│
-                                  │  live feed, audit    │
-                                  │  trail, $ recovered  │
-                                  └───────────────────┘
+Browser
+  │
+  ├── / (Landing Page)          → page.tsx — Galaxy WebGL, pipeline explainer, playbook cards
+  └── /dashboard                → dashboard/page.tsx — 7-tab control tower
+        │
+        ├── Recovery Queue      → RecoveryQueue.tsx + GET /api/cases
+        ├── Playbook Analytics  → RecoveryCharts.tsx + GET /api/metrics
+        ├── Batch Simulator     → SimulationRunner.tsx + POST /api/simulate
+        ├── Escalations         → EscalationsView.tsx + GET /api/escalations
+        ├── Promise-to-Pay      → PromiseToPay.tsx + GET /api/promises
+        ├── Audit Trail         → AuditTrailView.tsx + GET /api/audit
+        └── Guardrail Policy    → GuardrailSettingsView.tsx + GET|PATCH /api/guardrails
+
+Next.js API Routes (src/app/api/)
+  ├── GET  /api/cases                → list all cases (filter: playbook, status, search)
+  ├── GET  /api/cases/[id]           → single case with full audit + decisions
+  ├── POST /api/cases/[id]/action    → run RecoveryPipeline.processCase(id)
+  ├── GET  /api/metrics              → dashboard KPIs from DatabaseService
+  ├── POST /api/simulate             → SimulationEngine.runBatchSimulation(config)
+  ├── GET  /api/escalations          → list escalations
+  ├── GET  /api/promises             → list promise-to-pay records
+  ├── GET  /api/audit                → recent 100 audit events (or by caseId)
+  ├── GET|PATCH /api/guardrails      → read/update guardrail policy
+  └── GET  /api/health               → server health check
+
+Server-side Singleton (Node.js process memory)
+  └── DatabaseService (src/lib/db/index.ts)
+        ├── customers: Map<id, CustomerRecord>       ← seeded from customers.csv
+        ├── cases: Map<id, RecoveryCaseRecord>       ← seeded from recovery_cases.csv
+        ├── ledger: Map<id, RecoveryLedgerRecord>    ← seeded from recovery_ledger.csv
+        ├── audits: AuditRecord[]                    ← seeded from audit_log.csv
+        ├── escalations: Map<id, EscalationRecord>   ← seeded from escalations.csv
+        ├── promises: Map<id, PromiseRecord>         ← seeded from promises.csv
+        └── guardrails: GuardrailPolicy              ← in-memory defaults, PATCH via API
 ```
+
+> **Important:** Because `DatabaseService` is a server-side in-memory singleton, data resets on every server restart/cold start. This is intentional for a prototype — add a real database (Postgres/PlanetScale) to make it persistent.
 
 ---
 
 ## Project Structure
 
 ```
-ai-revenue-recovery/
-├── apps/
-│   ├── web/                  # Next.js dashboard + API routes (ingestion, auth)
-│   │   ├── app/
-│   │   ├── components/
-│   │   └── lib/
-│   └── worker/                # Python agent worker
-│       ├── agent/
-│       │   ├── detect.py
-│       │   ├── diagnose.py
-│       │   ├── decide.py       # Claude function-calling decision step
-│       │   ├── playbooks/      # one file per playbook in the table above
-│       │   └── act.py
-│       ├── tools/              # allowed-action implementations (retry, sms, etc.)
-│       └── queue_consumer.py
-├── packages/
-│   └── db/                    # Postgres schema + migrations (shared types)
-├── infra/
-│   └── docker-compose.yml     # local Postgres + Redis for dev
-├── .env.example
-└── README.md                  # this file
+AI-Revenue-Recovery/
+├── src/
+│   ├── app/
+│   │   ├── page.tsx                    # Landing page (Galaxy, pipeline explainer, playbooks)
+│   │   ├── layout.tsx                  # Root layout — fonts, metadata
+│   │   ├── globals.css                 # Tailwind + custom dark theme CSS variables
+│   │   ├── error.tsx                   # Root error boundary
+│   │   ├── dashboard/
+│   │   │   ├── page.tsx                # 7-tab dashboard (Client Component)
+│   │   │   └── error.tsx               # Dashboard error boundary
+│   │   └── api/
+│   │       ├── cases/
+│   │       │   ├── route.ts            # GET /api/cases
+│   │       │   └── [id]/
+│   │       │       ├── route.ts        # GET /api/cases/[id]
+│   │       │       └── action/
+│   │       │           └── route.ts    # POST /api/cases/[id]/action
+│   │       ├── metrics/route.ts        # GET /api/metrics
+│   │       ├── simulate/route.ts       # POST /api/simulate
+│   │       ├── escalations/route.ts    # GET /api/escalations
+│   │       ├── promises/route.ts       # GET /api/promises
+│   │       ├── audit/route.ts          # GET /api/audit
+│   │       ├── guardrails/route.ts     # GET|PATCH /api/guardrails
+│   │       └── health/route.ts         # GET /api/health
+│   │
+│   ├── components/
+│   │   ├── Navbar.tsx                  # Top navigation bar with live metrics ticker
+│   │   ├── LoadingScreen.tsx           # Animated loading screen with progress steps
+│   │   ├── MetricsOverview.tsx         # KPI cards: at-risk, recovered, recovery rate
+│   │   ├── RecoveryQueue.tsx           # Live case list with filter/search + action trigger
+│   │   ├── DecisionTraceModal.tsx      # Modal: full agent decision trace + audit timeline
+│   │   ├── SimulationRunner.tsx        # Batch simulator UI (1–100 cases, live progress)
+│   │   ├── GuardrailSettingsView.tsx   # Guardrail policy editor (sliders + toggles)
+│   │   ├── AuditTrailView.tsx          # Append-only audit log table with stage badges
+│   │   ├── EscalationsView.tsx         # Escalations list + approve/reject actions
+│   │   ├── PromiseToPay.tsx            # P2P tracker with status badges and calendar dates
+│   │   ├── charts/
+│   │   │   └── RecoveryCharts.tsx      # Recharts: playbook bar, category pie, area trend
+│   │   ├── effects/
+│   │   │   ├── Galaxy.tsx              # Three.js / OGL galaxy particle system (WebGL)
+│   │   │   ├── Galaxy.css              # Galaxy canvas styles
+│   │   │   ├── FoldText.tsx            # GSAP animated fold/reveal text effect
+│   │   │   ├── GhostCursor.tsx         # Ghost trail cursor effect
+│   │   │   └── GlowCursor.tsx          # Glow cursor effect
+│   │   └── ui/                         # Shared primitive UI components
+│   │
+│   ├── lib/
+│   │   ├── types.ts                    # All TypeScript domain types
+│   │   ├── store.ts                    # RecoverAIStore (legacy in-memory store, used by agent-engine)
+│   │   ├── agent-engine.ts             # RecoveryAgentEngine: diagnose+decide+execute (store-backed)
+│   │   ├── simulation-engine.ts        # SimulationEngine: batch case generation + pipeline
+│   │   ├── razorpay-adapter.ts         # RazorpayService: live test mode + mock fallback
+│   │   ├── db/
+│   │   │   └── index.ts                # DatabaseService: CSV-seeded in-memory Maps
+│   │   └── playbooks/
+│   │       ├── index.ts                # PlaybookType enum + PLAYBOOK_CONFIGS
+│   │       └── engine.ts               # RecoveryPipeline: full 9-stage processing
+│   │
+│   └── data/                           # (legacy) static seed data referenced by store.ts
+│
+├── data/
+│   └── seed/                           # CSV seed files loaded by DatabaseService at startup
+│       ├── customers.csv               # 20 synthetic Indian customer profiles
+│       ├── recovery_cases.csv          # ~100 pre-seeded recovery cases across all playbooks
+│       ├── audit_log.csv               # ~500 audit events across seeded cases
+│       ├── recovery_ledger.csv         # Verified recovery ledger entries
+│       ├── escalations.csv             # Pre-seeded escalation records
+│       └── promises.csv                # Pre-seeded promise-to-pay records
+│
+├── public/                             # Static assets (SVGs)
+├── package.json                        # npm dependencies (see Tech Stack)
+├── next.config.ts                      # Next.js config
+├── tsconfig.json                       # TypeScript config
+├── postcss.config.mjs                  # PostCSS + Tailwind v4
+├── eslint.config.mjs                   # ESLint 9 flat config
+└── .env.example                        # Environment variable template
 ```
 
 ---
@@ -205,173 +245,164 @@ ai-revenue-recovery/
 ### Prerequisites
 
 - Node.js 20+
-- Python 3.11+
-- Docker (for local Postgres + Redis)
-- A Stripe test account (or Razorpay test account)
-- An Anthropic API key
-- (Optional) Twilio account for SMS/WhatsApp/voice playbooks
+- npm 10+
+- No database, no Redis, no external API keys required to run locally
 
-### Setup (CLI)
+### Setup
 
 ```bash
 # 1. Clone and enter the repo
-git clone <your-repo-url> ai-revenue-recovery
-cd ai-revenue-recovery
+git clone <your-repo-url> AI-Revenue-Recovery
+cd AI-Revenue-Recovery
 
-# 2. Copy env template and fill in secrets
+# 2. Install dependencies
+npm install
+
+# 3. (Optional) Copy env file and add Razorpay test credentials
+#    Without credentials the Razorpay mock adapter activates automatically
 cp .env.example .env
 
-# 3. Start local infra (Postgres + Redis)
-docker compose -f infra/docker-compose.yml up -d
-
-# 4. Install frontend deps and run the dashboard
-cd apps/web
-npm install
-npm run db:migrate      # applies Postgres schema
-npm run dev             # dashboard at http://localhost:3000
-
-# 5. In a second terminal, install and run the agent worker
-cd apps/worker
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python queue_consumer.py
-
-# 6. In a third terminal, forward Stripe webhooks to your local ingestion API
-stripe listen --forward-to localhost:3000/api/webhooks/stripe
+# 4. Run the dev server
+npm run dev
+# → http://localhost:3000
 ```
 
-Once all three are running: trigger a test failed payment from the Stripe
-CLI (`stripe trigger charge.failed`) and watch it appear in the dashboard's
-live feed within a few seconds, move through Detect → Diagnose → Decide →
-Act → Verify, and land in the audit log.
+That's it. The app seeds all data from CSV files in `data/seed/` on first request. No migrations, no docker, no worker process.
 
----
-
-## CLI Reference
-
-The worker also exposes a small CLI for running things without the UI —
-useful for demos, batch tests, and judging.
+### Production Build
 
 ```bash
-# Run a single case through the full loop manually (for demoing)
-python -m worker.cli run-case --case-id <id>
-
-# Replay a batch of synthetic failed payments / abandoned checkouts
-python -m worker.cli seed-batch --count 50 --type failed_payment
-
-# Print the recovery report for a batch (money recovered, win rate, per-playbook breakdown)
-python -m worker.cli report --batch-id <id>
-
-# Dry-run mode: agent decides but does NOT execute any action (safe for demos)
-python -m worker.cli run-case --case-id <id> --dry-run
-
-# Tail the audit log for a case in the terminal
-python -m worker.cli audit --case-id <id> --follow
+npm run build
+npm run start
 ```
 
 ---
 
 ## Environment Variables
 
-| Variable | Purpose |
-|---|---|
-| `DATABASE_URL` | Postgres connection string |
-| `REDIS_URL` | Redis connection string for the job queue |
-| `ANTHROPIC_API_KEY` | Powers the diagnose/decide step |
-| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Payment events + retry execution |
-| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` | SMS / WhatsApp / voice playbooks |
-| `NEXTAUTH_SECRET` | Dashboard auth |
-| `MAX_AUTO_ACTION_RISK_SCORE` | Cases above this score require human approval instead of auto-execution |
-| `DRY_RUN` | If `true`, agent decides but never calls a real provider action |
+| Variable | Required | Purpose |
+|---|---|---|
+| `RAZORPAY_KEY_ID` | Optional | Razorpay test-mode key. If omitted, the mock adapter runs automatically. |
+| `RAZORPAY_KEY_SECRET` | Optional | Razorpay test-mode secret. |
+| `NEXT_PUBLIC_APP_URL` | Optional | Public base URL (used for link generation). Defaults to `http://localhost:3000`. |
+| `NODE_ENV` | Auto-set | `development` / `production` |
 
-See `.env.example` in the repo root for the full list with sample values.
+No database URL, no Redis URL, no auth secrets required. The app runs fully on in-memory state seeded from CSV files.
 
 ---
 
-## Data Model & Audit Trail
+## API Routes
 
-Every case is tracked end-to-end so results are verifiable, not just claimed.
+All routes are Next.js App Router route handlers under `src/app/api/`.
 
-**`cases`** — one row per at-risk-revenue event (payment failure, abandoned
-checkout, overdue invoice, failed mandate). Tracks status
-(`detected → diagnosing → decided → acting → recovered/failed/escalated`).
-
-**`audit_log`** — append-only. One row per step the agent takes on a case:
-what signal triggered it, what root cause it inferred, what playbook and
-action it chose, what it actually executed, the provider's response, and the
-outcome. This is what makes the system reviewable after the fact — anyone
-can reconstruct exactly why the agent did what it did for any case.
-
-**`recovery_ledger`** — one row per dollar (or ₹) recovered, linked back to
-its case, so the "money recovered" number shown on the dashboard is always
-traceable to real, verified provider confirmations — not an estimate.
-
-**`promises`** — for the promise-to-pay playbook: customer, committed date,
-amount, whether it was kept, and the follow-up action if it wasn't.
+| Method | Route | Description |
+|---|---|---|
+| `GET` | `/api/cases` | List all cases. Query params: `playbook`, `status`, `search` |
+| `GET` | `/api/cases/[id]` | Single case with decisions, interventions, and audit logs |
+| `POST` | `/api/cases/[id]/action` | Trigger full recovery pipeline on a case |
+| `GET` | `/api/metrics` | Dashboard KPIs: totals, recovery rate, playbook breakdown, recent recoveries |
+| `POST` | `/api/simulate` | Run batch simulation. Body: `{ batchSize: number (1–100) }` |
+| `GET` | `/api/escalations` | List all escalation records |
+| `POST` | `/api/escalations` | Approve or reject an escalation |
+| `GET` | `/api/promises` | List all promise-to-pay records |
+| `GET` | `/api/audit` | Last 100 audit events. Query param: `caseId` to filter |
+| `GET` | `/api/guardrails` | Current guardrail policy |
+| `PATCH` | `/api/guardrails` | Update guardrail policy (persists in-memory for session) |
+| `GET` | `/api/health` | Health check — returns `{ status: "ok" }` |
 
 ---
 
-## Guardrails, Stopping Rules & Compliance
+## Data Model
 
-This is the part that separates a real recovery agent from a spam bot, so
-it's called out explicitly:
+### `RecoveryCaseRecord`
+One row per revenue-at-risk event. Fields include `id`, `customer_*`, `amount`, `currency`, `playbook`, `failure_reason`, `status`, `recovery_confidence`, `recovered_amount`, `retry_count`, `diagnosis_summary`, `rationale`, `escalation_reason`, `escalated_to`.
 
-- **Bounded action set** — the agent can only call a fixed list of tools
-  (retry, remind, offer grace period, escalate). It cannot invent new
-  actions or contact channels.
-- **Retry limits** — payment retries are capped (default: 3 attempts) and
-  spaced per network/provider rules to avoid triggering fraud flags or
-  repeated decline penalties.
-- **Contact frequency caps** — a customer can only be messaged N times per
-  case per channel before the case auto-escalates to a human instead of
-  continuing to nudge.
-- **Risk-based human approval** — cases above `MAX_AUTO_ACTION_RISK_SCORE`
-  (e.g., high-value B2B invoices, disputes, anything flagged as possible
-  fraud) require a human to approve the action in the dashboard before it
-  executes.
-- **Opt-out respected immediately** — any customer reply indicating
-  "stop"/"do not contact" halts all further automated outreach on that case
-  and escalates it.
-- **Full audit trail** — every automated action is logged with its reasoning
-  and outcome (see above), so any recovered/attempted case can be reviewed
-  or disputed after the fact.
+**Status progression:**
+```
+DETECTED → DIAGNOSING → DECIDED → ACTION_IN_PROGRESS → RECOVERED
+                                                      → ESCALATED
+                                                      → STOPPED_MAX_RETRIES
+```
+
+### `AuditRecord`
+Append-only. One row per pipeline stage executed on a case. Fields: `id`, `case_id`, `timestamp`, `stage`, `actor`, `action`, `result`, `details`.
+
+**Stages:** `DETECT` → `DIAGNOSE` → `DECIDE_PLAYBOOK` → `CHECK_GUARDRAILS` → `EXECUTE_ACTION` → `VERIFY` → `STOP_OR_ESCALATE`
+
+**Actors:** `RECOVER_AI_DIAGNOSTIC_MODEL`, `RECOVER_AI_PLAYBOOK_RUNNER`, `GUARDRAIL_COMPLIANCE_MONITOR`, `RAZORPAY_WEBHOOK_HANDLER`, `RECOVER_AI_ENGINE`
+
+### `RecoveryLedgerRecord`
+One row per verified recovery. Linked to its case. Amount is only written here when Razorpay (or the mock adapter) confirms capture — not on prediction. Fields include `idempotency_key` to prevent double-counting.
+
+### `EscalationRecord`
+Created when a guardrail triggers human review. Status: `PENDING` → `APPROVED` / `REJECTED` / `RESOLVED`.
+
+### `PromiseRecord`
+Tracks customer settlement commitments. Status: `PROMISED` → `UPCOMING` → `DUE` → `KEPT` / `BROKEN` / `ESCALATED`.
+
+### `GuardrailPolicy`
+In-memory, editable via `PATCH /api/guardrails`. Fields:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `maxRetries` | 3 | Max automated retry attempts before escalation |
+| `cooldownHours` | 0.25 | Minimum gap between retries (15 min) |
+| `maxRiskScoreForAutonomousAction` | 65 | Risk scores above this require human approval |
+| `highValueThreshold` | ₹1,00,000 | Amounts above this require human approval |
+| `dailyContactLimit` | 2 | Max customer contacts per day per case |
+| `enableVoiceAiForEnterpriseOnly` | false | Restricts IVR/voice playbook to ENTERPRISE segment |
 
 ---
 
-## Metrics Dashboard
+## Guardrails & Stopping Rules
 
-The dashboard's core view is a **batch report**, not just a live feed:
+The agent will **not** execute an autonomous action if any of these conditions are true:
 
-- Total revenue at risk detected (batch)
-- Total revenue recovered (batch), with $ traced to `recovery_ledger`
-- Recovery rate by playbook (e.g., payment retries vs. checkout nudges)
-- Average time-to-recovery per case
-- Escalation rate (cases that needed a human)
-- Audit log drill-down per case
+- `retry_count >= guardrails.maxRetries` (max retries reached)
+- `customer_risk_score > guardrails.maxRiskScoreForAutonomousAction` (risk too high)
+- `amount > guardrails.highValueThreshold` (value too high for autonomous action)
 
-This is the view meant to answer "show me it actually worked," not just
-"show me it detected problems."
+In all three cases the case is moved to `ESCALATED` status, an `EscalationRecord` is created and assigned to a human ops specialist, and the audit log records which guardrail triggered.
+
+All guardrail thresholds are configurable live from the dashboard's **Guardrail Policy** tab without redeployment.
+
+---
+
+## Dashboard Views
+
+The `/dashboard` page has seven tabs:
+
+| Tab | Component | What It Shows |
+|---|---|---|
+| Recovery Queue | `RecoveryQueue.tsx` | Live list of all cases. Filter by playbook/status/search. Click a case to open the Decision Trace modal with full agent reasoning + audit timeline. Click "Run Recovery" to trigger the pipeline. |
+| Playbook Analytics | `RecoveryCharts.tsx` | Bar chart of recovery rate per playbook, area chart of recovery over time, pie chart of case distribution by category |
+| Batch Simulator | `SimulationRunner.tsx` | Generates 1–100 synthetic cases and runs them through the full pipeline. Shows live progress, per-case result table, and batch summary metrics. |
+| Escalations & Approvals | `EscalationsView.tsx` | Cases that hit a guardrail. Approve or reject to unblock or close. |
+| Promise-to-Pay | `PromiseToPay.tsx` | Tracks customer settlement commitments, due dates, and status. |
+| Immutable Audit Trail | `AuditTrailView.tsx` | Append-only log of all pipeline events with stage, actor, action, result, and timestamp. |
+| Guardrail Policy | `GuardrailSettingsView.tsx` | Live editor for all guardrail thresholds. Changes take effect immediately for new cases. |
 
 ---
 
 ## Known Limitations
 
-- Prototype-grade: no production PCI-scope review has been done; do not
-  point this at live card data without a proper compliance pass.
-- Voice/Hinglish playbook assumes a third-party voice API (e.g., Twilio +
-  a TTS/ASR provider) — not built from scratch here.
-- Fraud detection is out of scope; the agent assumes cases handed to it are
-  legitimate revenue-recovery opportunities, not fraud investigations.
-- Single-currency assumptions in the sample schema — multi-currency ledger
-  math would need hardening before real use.
+- **In-memory only.** All data resets on server restart. For persistence, replace `DatabaseService` with a Postgres/PlanetScale adapter.
+- **No authentication.** The dashboard has no login. Add NextAuth.js or Clerk before any production use.
+- **Deterministic agent, not LLM-powered.** The decision engine is a hand-coded decision matrix, not a live model call. This is intentional for demo reliability and auditability.
+- **Razorpay mock adapter.** Without real credentials, no actual payment operations are performed. The mock returns realistic-looking responses.
+- **Single currency (INR).** The ledger math and display assume Indian Rupees.
+- **No real-time webhooks.** Cases are updated by API calls from the dashboard, not by live Razorpay webhooks (though the data model and audit log are designed to support them).
+- **Prototype compliance.** No PCI-scope review has been done. Do not connect to live cardholder data without a compliance pass.
 
 ---
 
 ## Roadmap
 
-- [ ] Configurable playbooks via the dashboard (no code change to adjust
-      retry counts, message copy, escalation thresholds)
+- [ ] Persistent database (Postgres) — replace in-memory `DatabaseService`
+- [ ] Live Razorpay webhook ingestion (`/api/webhooks/razorpay`)
+- [ ] Dashboard authentication (NextAuth.js or Clerk)
+- [ ] Configurable playbook parameters from UI (retry counts, message copy, thresholds)
 - [ ] A/B testing of nudge copy and timing
 - [ ] Multi-currency ledger support
-- [ ] Webhook support for more providers (Razorpay, PayPal, Braintree)
 - [ ] Role-based access control for the approval queue
+- [ ] LLM-assisted diagnosis step (Claude function calling for edge cases)

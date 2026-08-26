@@ -22,10 +22,53 @@ export class RecoveryPipeline {
       throw new Error(`Case ${caseId} not found`);
     }
 
-    const guardrails = db.getGuardrails();
-    const config = PLAYBOOK_CONFIGS[recCase.playbook];
     const now = new Date().toISOString();
     const generatedAudits: AuditRecord[] = [];
+
+    // Terminal state protection: if already recovered or stopped, do not re-run
+    if (recCase.status === 'RECOVERED') {
+      return {
+        success: true,
+        case: recCase,
+        recovered: true,
+        escalated: false,
+        stopped: true,
+        reason: `Case is already verified and recovered (₹${(recCase.recovered_amount || recCase.amount).toLocaleString('en-IN')})`,
+        auditTrail: db.getAuditsByCaseId(caseId)
+      };
+    }
+
+    if (recCase.status === 'STOPPED_MAX_RETRIES' || recCase.status === 'STOPPED_UNRECOVERABLE') {
+      return {
+        success: false,
+        case: recCase,
+        recovered: false,
+        escalated: false,
+        stopped: true,
+        reason: `Case reached terminal state: ${recCase.status}`,
+        auditTrail: db.getAuditsByCaseId(caseId)
+      };
+    }
+
+    const guardrails = db.getGuardrails();
+    const config = PLAYBOOK_CONFIGS[recCase.playbook];
+
+    // Stage 0: Record DETECT if not present
+    const existingAudits = db.getAuditsByCaseId(caseId);
+    if (!existingAudits.some(a => a.stage === 'DETECT')) {
+      const detectAudit: AuditRecord = {
+        id: `aud_${recCase.id}_det_${Date.now()}`,
+        case_id: recCase.id,
+        timestamp: recCase.created_at || now,
+        stage: 'DETECT',
+        actor: 'RECOVER_AI_ENGINE',
+        action: 'REVENUE_AT_RISK_DETECTED',
+        result: 'SUCCESS',
+        details: `Signal detected: ₹${recCase.amount.toLocaleString('en-IN')} at risk for ${recCase.customer_name}. Reason: ${recCase.failure_reason}`
+      };
+      db.addAudit(detectAudit);
+      generatedAudits.push(detectAudit);
+    }
 
     // Stage 1: DIAGNOSE & RISK SCORE
     recCase.status = 'DIAGNOSING';

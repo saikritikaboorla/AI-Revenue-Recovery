@@ -421,6 +421,34 @@ export class DatabaseService {
     this.escalations.set(esc.id, esc);
   }
 
+  public addPromise(promise: PromiseRecord): void {
+    this.promises.set(promise.id, promise);
+  }
+
+  public updatePromiseStatus(caseId: string, status: PromiseRecord['status']): void {
+    for (const [id, prom] of this.promises.entries()) {
+      if (prom.case_id === caseId) {
+        prom.status = status;
+        this.promises.set(id, prom);
+      }
+    }
+  }
+
+  public getPromiseByCaseId(caseId: string): PromiseRecord | undefined {
+    for (const prom of this.promises.values()) {
+      if (prom.case_id === caseId) return prom;
+    }
+    return undefined;
+  }
+
+  public getCustomerById(id: string): CustomerRecord | undefined {
+    return this.customers.get(id);
+  }
+
+  public getLedgerEntries(): RecoveryLedgerRecord[] {
+    return Array.from(this.ledger.values());
+  }
+
   public resolveEscalation(caseId: string, status: 'APPROVED' | 'REJECTED'): void {
     for (const [id, esc] of this.escalations.entries()) {
       if (esc.case_id === caseId) {

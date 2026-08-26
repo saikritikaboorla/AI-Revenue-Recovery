@@ -26,7 +26,7 @@ import {
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
 
-type TabId = 'queue' | 'analytics' | 'simulation' | 'escalations' | 'promises' | 'audit' | 'guardrails';
+type TabId = 'overview' | 'queue' | 'analytics' | 'simulation' | 'escalations' | 'promises' | 'audit' | 'guardrails';
 
 const TABS: { id: TabId; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'queue',       label: 'Recovery Queue',          icon: Radio },
@@ -41,9 +41,13 @@ const TABS: { id: TabId; label: string; icon: React.ComponentType<{ className?: 
 const VALID_TABS = new Set<string>(TABS.map(t => t.id));
 
 function readHashTab(): TabId {
-  if (typeof window === 'undefined') return 'queue';
+  if (typeof window === 'undefined') return 'overview';
   const h = window.location.hash.replace('#', '');
-  return VALID_TABS.has(h) ? (h as TabId) : 'queue';
+  return h === 'overview' || h === ''
+    ? 'overview'
+    : VALID_TABS.has(h)
+      ? (h as TabId)
+      : 'overview';
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -86,8 +90,9 @@ function Toast({ toasts, onDismiss }: { toasts: ToastMsg[]; onDismiss: (id: numb
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  // Read hash synchronously on first render to avoid flash of wrong tab
-  const [activeTab, setActiveTab] = useState<TabId>(readHashTab);
+  // Start from the server-renderable overview, then apply the browser hash on mount.
+  // This avoids a hydration mismatch on a direct refresh of /dashboard#queue.
+  const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [metrics, setMetrics] = useState<any>(null);
   const [cases, setCases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

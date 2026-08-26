@@ -4,7 +4,6 @@ import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { Navbar } from '@/components/Navbar';
-import { FoldText } from '@/components/effects/FoldText';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import {
   Zap,
@@ -152,9 +151,9 @@ export default function LandingPage() {
   const [metrics, setMetrics]   = useState<Metrics | null>(null);
   const [metricsFetching, setMetricsFetching] = useState(true);
 
-  // LoadingScreen: dismiss after 2.5 s
+  // Reveal as soon as the initial application shell has had time to hydrate.
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 2500);
+    const t = setTimeout(() => setLoading(false), 2200);
     return () => clearTimeout(t);
   }, []);
 
@@ -251,26 +250,37 @@ export default function LandingPage() {
         {/* ════════════════════════════════════════════════════════════════════
             HERO
         ════════════════════════════════════════════════════════════════════ */}
-        <section className="relative pt-28 pb-20 md:pt-40 md:pb-28 px-4 sm:px-6 lg:px-8 text-center max-w-5xl mx-auto">
+        <section className="relative pt-24 pb-20 md:pt-36 md:pb-28 px-4 sm:px-6 lg:px-8 text-center max-w-6xl mx-auto">
 
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-semibold tracking-widest uppercase mb-8 shadow-[0_0_20px_rgba(59,130,246,0.2)]">
-            <Zap className="h-3.5 w-3.5 shrink-0" />
-            Razorpay AI Buildathon · Autonomous Revenue Recovery Agent
+          {/* Precision Badge */}
+          <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-[11px] sm:text-xs font-semibold tracking-[0.12em] uppercase mb-12 sm:mb-16 shadow-[0_0_25px_rgba(59,130,246,0.18)] backdrop-blur-md">
+            <Zap className="h-4 w-4 text-blue-400 shrink-0" />
+            Autonomous Closed-Loop Revenue Recovery Agent
           </div>
 
-          {/* FoldText headline */}
-          <FoldText
-            text="REVENUE IS SLIPPING. THE AGENT FINDS IT."
-            className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-extrabold tracking-tight text-white mb-0"
-            subtext="An autonomous closed-loop AI agent that detects revenue at risk, selects the optimal recovery playbook, executes bounded actions, verifies settlement on Razorpay, and writes every rupee to an immutable ledger — all without human intervention."
-          />
+          {/* Large Bold Hero Headline */}
+          <h1 className="mx-auto max-w-5xl text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-[-0.035em] text-white leading-[1.06] mb-9 sm:mb-11">
+            REVENUE IS SLIPPING. <br className="hidden sm:block" />
+            <span className="bg-gradient-to-r from-blue-400 via-teal-300 to-indigo-400 bg-clip-text text-transparent">
+              THE AGENT FINDS IT.
+            </span>
+          </h1>
 
-          {/* CTAs */}
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+          {/* Separate text blocks keep the product proposition editorial and readable. */}
+          <p className="text-base sm:text-lg md:text-xl text-[#D7E2F2] font-normal max-w-3xl mx-auto leading-[1.8] tracking-[0.01em] mb-5">
+            An autonomous AI agent that detects revenue at risk, diagnoses the cause, selects the right recovery playbook, and executes bounded recovery actions.
+          </p>
+
+          {/* Supporting Trust Line */}
+          <p className="text-sm sm:text-base text-[#93A7C3] font-medium max-w-2xl mx-auto leading-[1.75] tracking-[0.015em] mb-12 sm:mb-14">
+            Every recovery is verified, measured, and recorded in an auditable ledger.
+          </p>
+
+          {/* CTAs with 3D Depth */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-20">
             <Link
               href="/dashboard"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-base transition-all shadow-[0_0_30px_rgba(59,130,246,0.45)] hover:shadow-[0_0_45px_rgba(59,130,246,0.65)] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#070A10]"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-9 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold text-base sm:text-lg transition-all shadow-[0_10px_30px_rgba(37,99,235,0.4)] hover:shadow-[0_15px_40px_rgba(37,99,235,0.6)] hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               <Activity className="h-5 w-5 shrink-0" />
               LAUNCH COMMAND CENTER
@@ -279,15 +289,58 @@ export default function LandingPage() {
 
             <Link
               href="/dashboard#simulation"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl border border-[#1E2A3A] bg-[#0D1320]/70 hover:bg-[#131B2C] hover:border-[#2E3F55] text-[#F0F4FF] font-semibold text-base transition-all backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-[#070A10]"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-xl border border-[#253347] bg-[#0E1524]/80 hover:bg-[#152035] hover:border-blue-500/40 text-[#E2EAF8] font-semibold text-base sm:text-lg transition-all backdrop-blur-md hover:-translate-y-0.5 shadow-lg"
             >
-              <PlayCircle className="h-5 w-5 shrink-0 text-cyan-400" />
-              RUN BATCH SIMULATION
+              <PlayCircle className="h-5 w-5 shrink-0 text-teal-400" />
+              RUN BATCH SIMULATOR
             </Link>
           </div>
 
+          {/* 3D Visual Pipeline Container */}
+          <div className="relative rounded-3xl border border-blue-500/20 bg-gradient-to-b from-[#0F172A]/90 to-[#070A12]/90 p-6 sm:p-8 backdrop-blur-xl shadow-[0_25px_60px_rgba(0,0,0,0.7),0_0_40px_rgba(59,130,246,0.15)] mb-16 text-left">
+            <div className="flex items-center justify-between border-b border-[#1E2A3A] pb-4 mb-6">
+              <div className="flex items-center gap-2.5">
+                <div className="h-3 w-3 rounded-full bg-teal-400 shadow-[0_0_10px_#2DD4BF] animate-pulse" />
+                <span className="text-xs sm:text-sm font-mono uppercase tracking-widest text-[#94A3B8]">
+                  Closed-Loop Autonomous Architecture
+                </span>
+              </div>
+              <span className="text-xs font-mono px-2.5 py-1 rounded-md bg-teal-950/60 border border-teal-500/30 text-teal-300">
+                Guardrail Enforced
+              </span>
+            </div>
+
+            {/* 5-Node Visual Flow */}
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 relative">
+              {[
+                { step: '01', title: 'Revenue At Risk', desc: 'Webhook catches dropoffs & bank declines', color: 'border-amber-500/30 bg-amber-500/5 text-amber-400' },
+                { step: '02', title: 'AI Detection', desc: 'Analyzes root failure code & risk factor', color: 'border-blue-500/30 bg-blue-500/5 text-blue-400' },
+                { step: '03', title: 'Recovery Decision', desc: 'Selects optimal bounded playbook & rails', color: 'border-purple-500/30 bg-purple-500/5 text-purple-400' },
+                { step: '04', title: 'Recovery Action', desc: 'Dispatches gateway failover or AI prompt', color: 'border-cyan-500/30 bg-cyan-500/5 text-cyan-400' },
+                { step: '05', title: 'Verified Revenue', desc: 'Verified settlement written to ledger', color: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-400' },
+              ].map((node, idx) => (
+                <div
+                  key={node.step}
+                  className={`rounded-2xl border ${node.color} p-4 sm:p-5 flex flex-col justify-between transition-all hover:-translate-y-1 hover:shadow-lg backdrop-blur-md`}
+                >
+                  <div>
+                    <span className="text-[11px] font-mono font-bold tracking-widest opacity-80 mb-2 block">
+                      STAGE {node.step}
+                    </span>
+                    <h4 className="text-base sm:text-lg font-bold text-[#F1F5F9] mb-1 leading-snug">
+                      {node.title}
+                    </h4>
+                  </div>
+                  <p className="text-xs sm:text-sm text-[#8EA2C6] leading-relaxed mt-2">
+                    {node.desc}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* ── Live Metric Cards ──────────────────────────────────────────── */}
-          <div className="mt-16 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 max-w-4xl mx-auto text-left">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto text-left">
             {metricsFetching
               ? Array.from({ length: 4 }).map((_, i) => <MetricSkeleton key={i} />)
               : metricCards.map((m) => {
@@ -295,18 +348,18 @@ export default function LandingPage() {
                   return (
                     <div
                       key={m.label}
-                      className={`rounded-xl border ${m.borderGlow} bg-[#0D1320]/80 p-5 backdrop-blur-sm transition-transform hover:-translate-y-0.5`}
+                      className={`rounded-2xl border ${m.borderGlow} bg-[#0E1524]/90 p-5 sm:p-6 backdrop-blur-md transition-all hover:-translate-y-1 hover:shadow-xl`}
                     >
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7FA3]">
+                        <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#8FA3C7]">
                           {m.label}
                         </span>
-                        <Icon className={`h-4 w-4 ${m.iconCls} opacity-80`} />
+                        <Icon className={`h-5 w-5 ${m.iconCls} opacity-90`} />
                       </div>
-                      <p className={`text-2xl font-extrabold tracking-tight ${m.valueColor}`}>
+                      <p className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${m.valueColor}`}>
                         {m.value ?? '—'}
                       </p>
-                      <p className="text-xs text-[#4B6A9B] mt-1">{m.sub}</p>
+                      <p className="text-xs sm:text-sm text-[#627D9E] mt-1.5 font-medium">{m.sub}</p>
                     </div>
                   );
                 })}
