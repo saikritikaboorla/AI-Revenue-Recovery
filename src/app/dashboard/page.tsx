@@ -40,6 +40,17 @@ const TABS: { id: TabId; label: string; icon: React.ComponentType<{ className?: 
 
 const VALID_TABS = new Set<string>(TABS.map(t => t.id));
 
+const TAB_ACCENTS: Record<TabId, { label: string; color: string; glow: string }> = {
+  overview: { label: 'Command Center', color: '#38bdf8', glow: 'rgba(56,189,248,.28)' },
+  queue: { label: 'Recovery Queue', color: '#2dd4bf', glow: 'rgba(45,212,191,.25)' },
+  analytics: { label: 'Analytics', color: '#818cf8', glow: 'rgba(129,140,248,.25)' },
+  simulation: { label: 'Batch Simulator', color: '#22d3ee', glow: 'rgba(34,211,238,.25)' },
+  escalations: { label: 'Escalations', color: '#c084fc', glow: 'rgba(192,132,252,.25)' },
+  promises: { label: 'Promise-to-Pay', color: '#2dd4bf', glow: 'rgba(45,212,191,.25)' },
+  audit: { label: 'Audit Ledger', color: '#94a3b8', glow: 'rgba(148,163,184,.20)' },
+  guardrails: { label: 'Guardrails', color: '#fbbf24', glow: 'rgba(251,191,36,.22)' },
+};
+
 function readHashTab(): TabId {
   if (typeof window === 'undefined') return 'overview';
   const h = window.location.hash.replace('#', '');
@@ -203,22 +214,27 @@ export default function DashboardPage() {
     await fetchData(true);
   }, [fetchData]);
 
+  const accent = TAB_ACCENTS[activeTab];
+
   return (
-    <main className="min-h-screen bg-[#080B12] text-[#F5F7FA] selection:bg-blue-500 selection:text-white">
+    <main
+      className="min-h-screen text-[#F5F7FA] selection:bg-blue-500 selection:text-white"
+      style={{ '--section-accent': accent.color, '--section-glow': accent.glow } as React.CSSProperties}
+    >
       <Navbar />
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
         {/* ── Dashboard Header ──────────────────────────────────────────── */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#252D3A] pb-6">
+        <div className="command-header flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#252D3A] pb-6">
           <div>
             <div className="flex items-center gap-2.5">
-              <div className="h-3 w-3 rounded-full bg-blue-500 shadow-[0_0_10px_#3B82F6] animate-pulse" />
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#F5F7FA]">
+              <div className="h-3 w-3 rounded-full animate-pulse" style={{ backgroundColor: accent.color, boxShadow: `0 0 14px ${accent.glow}` }} />
+              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#F5F7FA]">
                 AI Revenue Recovery Command Center
               </h1>
             </div>
-            <p className="text-xs sm:text-sm text-[#98A2B3] mt-1">
+            <p className="text-sm sm:text-base text-[#98A2B3] mt-2">
               Autonomous Closed-Loop Engine: Detect → Diagnose → Decide → Act → Verify → Stop
             </p>
           </div>
@@ -245,7 +261,7 @@ export default function DashboardPage() {
         <MetricsOverview metrics={metrics} loading={loading} />
 
         {/* ── Tab Bar ───────────────────────────────────────────────────── */}
-        <div className="flex flex-wrap gap-2 border-b border-[#252D3A] pb-3">
+        <div className="module-tabs flex flex-wrap gap-2 border-b border-[#252D3A] pb-3" aria-label="Command center modules">
           {TABS.map((t) => {
             const Icon = t.icon;
             const isActive = activeTab === t.id;
@@ -253,9 +269,9 @@ export default function DashboardPage() {
               <button
                 key={t.id}
                 onClick={() => handleTabClick(t.id)}
-                className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 ${
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 ${
                   isActive
-                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
+                    ? 'module-tab-active border shadow-[0_0_15px_var(--section-glow)]'
                     : 'text-[#98A2B3] hover:text-[#F5F7FA] hover:bg-[#141A24] border border-transparent'
                 }`}
               >
@@ -267,7 +283,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Tab Content ───────────────────────────────────────────────── */}
-        <div key={activeTab} className="animate-fade-in">
+        <div key={activeTab} className="module-content animate-fade-in" data-section={activeTab}>
 
           {activeTab === 'queue' && (
             <RecoveryQueue

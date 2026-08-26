@@ -76,7 +76,7 @@ function StatusBadge({ status }: { status: string }) {
       );
     case 'ESCALATED':
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-950/70 border border-amber-500/40 text-amber-400">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-950/70 border border-purple-500/40 text-purple-300">
           <AlertTriangle className="h-2.5 w-2.5" />
           Escalated
         </span>
@@ -281,7 +281,7 @@ export const RecoveryQueue: React.FC<RecoveryQueueProps> = ({
               placeholder="Search case ID, customer, reason…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-lg border border-[#252D3A] bg-[#080B12] py-2 pl-8 pr-3 text-xs text-[#F5F7FA] placeholder-[#98A2B3] focus:border-blue-500/70 focus:outline-none transition-colors"
+              className="w-full rounded-lg border border-[#252D3A] bg-[#080B12] py-2.5 pl-8 pr-3 text-sm text-[#F5F7FA] placeholder-[#98A2B3] focus:border-blue-500/70 focus:outline-none transition-colors"
             />
           </div>
 
@@ -291,7 +291,7 @@ export const RecoveryQueue: React.FC<RecoveryQueueProps> = ({
             <select
               value={selectedPlaybook}
               onChange={(e) => setSelectedPlaybook(e.target.value)}
-              className="w-full appearance-none rounded-lg border border-[#252D3A] bg-[#080B12] py-2 pl-8 pr-3 text-xs text-[#F5F7FA] focus:border-blue-500/70 focus:outline-none transition-colors cursor-pointer"
+              className="w-full appearance-none rounded-lg border border-[#252D3A] bg-[#080B12] py-2.5 pl-8 pr-3 text-sm text-[#F5F7FA] focus:border-blue-500/70 focus:outline-none transition-colors cursor-pointer"
             >
               {PLAYBOOKS.map((p) => (
                 <option key={p.value} value={p.value}>{p.label}</option>
@@ -305,7 +305,7 @@ export const RecoveryQueue: React.FC<RecoveryQueueProps> = ({
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full appearance-none rounded-lg border border-[#252D3A] bg-[#080B12] py-2 pl-8 pr-3 text-xs text-[#F5F7FA] focus:border-blue-500/70 focus:outline-none transition-colors cursor-pointer"
+              className="w-full appearance-none rounded-lg border border-[#252D3A] bg-[#080B12] py-2.5 pl-8 pr-3 text-sm text-[#F5F7FA] focus:border-blue-500/70 focus:outline-none transition-colors cursor-pointer"
             >
               {STATUSES.map((s) => (
                 <option key={s.value} value={s.value}>{s.label}</option>
@@ -397,12 +397,13 @@ export const RecoveryQueue: React.FC<RecoveryQueueProps> = ({
                 const amount          = Number(c.amount    ?? c.transaction?.amount    ?? 0);
                 const recoveredAmount = Number(c.recovered_amount ?? c.recoveredAmount ?? 0);
                 const confidence      = Number(c.recovery_confidence ?? c.recoveryConfidence ?? 0);
+                const rowStatus = String(c.status || '').toLowerCase().replace(/_/g, '-');
 
                 return (
                   <tr
                     key={c.id}
                     onClick={() => onSelectCase(c.id)}
-                    className="cursor-pointer transition-colors duration-100 hover:bg-[#141A24]/80 group"
+                    className={`data-row data-row-${rowStatus} cursor-pointer transition-colors duration-100 hover:bg-[#141A24]/80 group`}
                   >
                     {/* Case ID */}
                     <td className="py-3 px-4 align-middle">

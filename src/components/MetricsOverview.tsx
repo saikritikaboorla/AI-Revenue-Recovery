@@ -76,6 +76,7 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
       iconColor: 'text-amber-400',
       glow: 'shadow-[0_0_22px_rgba(245,158,11,0.10)] hover:shadow-[0_0_32px_rgba(245,158,11,0.18)]',
       border: 'border-[#252D3A] hover:border-amber-500/30',
+      accent: '#fbbf24',
     },
     {
       id: 'recoverable',
@@ -88,6 +89,7 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
       iconColor: 'text-teal-400',
       glow: 'shadow-[0_0_22px_rgba(20,184,166,0.10)] hover:shadow-[0_0_32px_rgba(20,184,166,0.18)]',
       border: 'border-[#252D3A] hover:border-teal-500/30',
+      accent: '#2dd4bf',
     },
     {
       id: 'recovered',
@@ -100,6 +102,7 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
       iconColor: 'text-emerald-400',
       glow: 'shadow-[0_0_22px_rgba(34,197,94,0.12)] hover:shadow-[0_0_32px_rgba(34,197,94,0.20)]',
       border: 'border-[#252D3A] hover:border-emerald-500/30',
+      accent: '#34d399',
     },
     {
       id: 'win-rate',
@@ -112,6 +115,7 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
       iconColor: 'text-blue-400',
       glow: 'shadow-[0_0_22px_rgba(59,130,246,0.10)] hover:shadow-[0_0_32px_rgba(59,130,246,0.18)]',
       border: 'border-[#252D3A] hover:border-blue-500/30',
+      accent: '#60a5fa',
     },
     {
       id: 'active-cases',
@@ -124,6 +128,7 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
       iconColor: 'text-cyan-400',
       glow: 'shadow-[0_0_22px_rgba(6,182,212,0.10)] hover:shadow-[0_0_32px_rgba(6,182,212,0.18)]',
       border: 'border-[#252D3A] hover:border-cyan-500/30',
+      accent: '#22d3ee',
     },
     {
       id: 'escalations',
@@ -131,11 +136,12 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
       value: escalatedCasesCount.toLocaleString('en-IN'),
       subtitle: 'Pending human review',
       icon: ShieldAlert,
-      valueColor: 'text-orange-400',
-      iconBg: 'bg-orange-500/10 border-orange-500/30',
-      iconColor: 'text-orange-400',
-      glow: 'shadow-[0_0_22px_rgba(249,115,22,0.10)] hover:shadow-[0_0_32px_rgba(249,115,22,0.18)]',
-      border: 'border-[#252D3A] hover:border-orange-500/30',
+      valueColor: 'text-purple-300',
+      iconBg: 'bg-purple-500/10 border-purple-500/30',
+      iconColor: 'text-purple-300',
+      glow: 'shadow-[0_0_22px_rgba(168,85,247,0.10)] hover:shadow-[0_0_32px_rgba(168,85,247,0.18)]',
+      border: 'border-[#252D3A] hover:border-purple-500/30',
+      accent: '#c084fc',
     },
     {
       id: 'ledger',
@@ -148,6 +154,7 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
       iconColor: 'text-indigo-400',
       glow: 'shadow-[0_0_22px_rgba(99,102,241,0.10)] hover:shadow-[0_0_32px_rgba(99,102,241,0.18)]',
       border: 'border-[#252D3A] hover:border-indigo-500/30',
+      accent: '#818cf8',
     },
   ];
 
@@ -159,25 +166,26 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
           <div
             key={card.id}
             className={`
-              relative h-28 overflow-hidden rounded-xl border bg-[#141A24]
-              p-4 flex flex-col justify-between
+              metric-card relative min-h-36 overflow-hidden rounded-2xl border bg-[#141A24]/90
+              p-5 flex flex-col justify-between
               transition-all duration-200
               ${card.border}
               ${card.glow}
             `}
+            style={{ color: card.accent }}
           >
             {/* Top row: label + icon */}
             <div className="flex items-start justify-between gap-2">
-              <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-[#98A2B3] leading-tight">
+              <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#98A2B3] leading-tight">
                 {card.title}
               </span>
               <div
                 className={`
-                  flex-shrink-0 p-1.5 rounded-lg border
+                  flex-shrink-0 p-2 rounded-xl border
                   ${card.iconBg}
                 `}
               >
-                <Icon className={`h-3.5 w-3.5 ${card.iconColor}`} />
+                <Icon className={`h-4 w-4 ${card.iconColor}`} />
               </div>
             </div>
 
@@ -185,13 +193,13 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
             <div>
               <div
                 className={`
-                  text-xl sm:text-2xl font-extrabold tracking-tight leading-none
+                  text-2xl sm:text-3xl font-extrabold tracking-tight leading-none
                   ${card.valueColor}
                 `}
               >
                 {card.value}
               </div>
-              <div className="mt-1 text-[10px] text-[#98A2B3] truncate">
+              <div className="mt-1.5 text-xs text-[#98A2B3] truncate">
                 {card.subtitle}
               </div>
             </div>

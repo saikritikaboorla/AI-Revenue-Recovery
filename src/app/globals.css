@@ -49,7 +49,7 @@ html {
 }
 
 body {
-  background: var(--bg-base);
+  background: #050914;
   color: var(--text-primary);
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   font-size: 14px;
@@ -57,6 +57,72 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
 }
+
+/* One fixed background, shared by the root layout. It stays outside the interaction
+   plane and every application surface below provides its own readable dark scrim. */
+.gradient-waves {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse 72% 42% at 50% 76%, rgba(12, 67, 104, .28), transparent 72%),
+    radial-gradient(ellipse 42% 30% at 76% 24%, rgba(12, 93, 111, .12), transparent 72%),
+    #050914;
+}
+
+/* A lightweight atmospheric fallback also gives the WebGL pass a visible
+   silhouette while it initializes. It is intentionally restrained and never
+   participates in hit testing. */
+.gradient-waves::before {
+  content: "";
+  position: absolute;
+  inset: -18% -8%;
+  opacity: .72;
+  background:
+    repeating-radial-gradient(ellipse 92% 19% at 50% 101%, transparent 0 15px, rgba(38, 151, 170, .16) 16px 17px, transparent 18px 33px),
+    linear-gradient(168deg, transparent 35%, rgba(24, 103, 142, .14) 54%, transparent 72%);
+  filter: blur(.2px);
+  mask-image: linear-gradient(to bottom, transparent 4%, #000 26%, #000 78%, transparent 100%);
+  animation: wave-drift 24s ease-in-out infinite alternate;
+}
+.gradient-waves::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(3,8,19,.18), rgba(3,8,19,.52) 67%, rgba(3,8,19,.84));
+  pointer-events: none;
+}
+.gradient-waves canvas { position: relative; z-index: 1; display: block; width: 100%; height: 100%; opacity: .86; }
+.gradient-waves--fallback canvas { display: none; }
+.app-chrome { position: relative; z-index: 1; min-height: 100vh; }
+
+.command-header { position: relative; padding: 1.35rem; border-radius: 1.25rem; background: linear-gradient(115deg, rgba(9,18,35,.87), rgba(8,17,31,.70)); backdrop-filter: blur(18px); box-shadow: 0 20px 55px rgba(0,0,0,.20); }
+.command-header::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--section-accent); border-radius: 99px; box-shadow: 0 0 18px var(--section-glow); }
+.module-tabs { position: relative; padding: .65rem; border-radius: 1rem; background: rgba(7,15,29,.68); backdrop-filter: blur(16px); }
+.module-tab-active { color: var(--section-accent); background: color-mix(in srgb, var(--section-accent) 12%, transparent); border-color: color-mix(in srgb, var(--section-accent) 42%, transparent); }
+.module-content { padding: .25rem; border-radius: 1.25rem; }
+.metric-card { isolation: isolate; box-shadow: 0 14px 34px rgba(0,0,0,.20), inset 0 1px rgba(255,255,255,.035); }
+.metric-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: currentColor; opacity: .7; }
+.metric-card:hover { transform: translateY(-3px); }
+
+/* The original interface used 9–11px labels in many operational views. These
+   guarded overrides establish a readable baseline while retaining hierarchy. */
+.app-chrome [class*="text-[9px]"] { font-size: .6875rem; }
+.app-chrome [class*="text-[10px]"] { font-size: .75rem; }
+.app-chrome [class*="text-[11px]"] { font-size: .8125rem; }
+.app-chrome .data-table th { font-size: .75rem; }
+.app-chrome .data-table td { font-size: .9375rem; }
+
+/* Semantic scan lines keep dense operations tables legible without turning rows into blocks of colour. */
+.data-row { border-left: 3px solid transparent; }
+.data-row-recovered { border-left-color: #34d399; background: rgba(16,185,129,.025); }
+.data-row-action-in-progress, .data-row-diagnosing, .data-row-decided, .data-row-verifying { border-left-color: #38bdf8; background: rgba(56,189,248,.025); }
+.data-row-escalated { border-left-color: #c084fc; background: rgba(192,132,252,.035); }
+.data-row-stopped, .data-row-stopped-max-retries, .data-row-stopped-unrecoverable { border-left-color: #fb7185; background: rgba(244,63,94,.035); }
+.data-row-detected { border-left-color: #fbbf24; background: rgba(245,158,11,.025); }
 
 /* ─── Custom Scrollbar ───────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
@@ -340,6 +406,10 @@ select.input-fintech option {
   0%,100% { box-shadow: 0 0 12px rgba(59,130,246,0.3); }
   50%      { box-shadow: 0 0 24px rgba(59,130,246,0.6); }
 }
+@keyframes wave-drift {
+  from { transform: translate3d(-1.5%, 1%, 0) scale(1.02); }
+  to { transform: translate3d(1.5%, -1%, 0) scale(1.06); }
+}
 
 .animate-fade-in     { animation: fadeIn 0.4s ease forwards; }
 .animate-fade-up     { animation: fadeUp 0.5s ease forwards; }
@@ -453,6 +523,7 @@ select.input-fintech option {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+  .gradient-waves::before { animation: none; }
 }
 
 /* ─── Responsive Helpers ─────────────────────────────────────────────────── */

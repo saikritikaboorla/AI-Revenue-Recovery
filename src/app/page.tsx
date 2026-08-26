@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
 import { Navbar } from '@/components/Navbar';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import {
@@ -25,11 +24,6 @@ import {
   ShoppingCart,
 } from 'lucide-react';
 
-// ── Galaxy: browser-only WebGL, no SSR ──────────────────────────────────────
-const Galaxy = dynamic(
-  () => import('@/components/effects/Galaxy'),
-  { ssr: false }
-);
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface Metrics {
@@ -220,25 +214,7 @@ export default function LandingPage() {
       {/* ── Loading screen ─────────────────────────────────────────────────── */}
       <LoadingScreen loading={loading} />
 
-      <div className="min-h-screen bg-[#070A10] text-[#F0F4FF] selection:bg-blue-500 selection:text-white relative overflow-x-hidden">
-
-        {/* ── Galaxy: fixed full-viewport background ──────────────────────── */}
-        <div className="fixed inset-0 -z-10 pointer-events-none">
-          <Suspense fallback={null}>
-            <Galaxy
-              mouseRepulsion={true}
-              mouseInteraction={true}
-              density={1.1}
-              glowIntensity={0.22}
-              saturation={0.55}
-              hueShift={220}
-              twinkleIntensity={0.18}
-              rotationSpeed={0.035}
-              transparent={true}
-              style={{ width: '100%', height: '100%' }}
-            />
-          </Suspense>
-        </div>
+      <div className="min-h-screen bg-[#070A10]/72 text-[#F0F4FF] selection:bg-blue-500 selection:text-white relative overflow-x-hidden">
 
         {/* ── Ambient radial glow behind hero ─────────────────────────────── */}
         <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
