@@ -31,9 +31,7 @@
 
 ---
 
-## 1. Overview (For Everyone)
-
-If you're not technical, here's the plain-English version.
+## 1. Overview 
 
 Businesses lose money in small, quiet ways every day: a customer's card
 gets declined, someone abandons their cart at checkout, a subscription
