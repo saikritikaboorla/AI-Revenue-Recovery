@@ -10,18 +10,20 @@ interface EscalationsViewProps {
 export const EscalationsView: React.FC<EscalationsViewProps> = ({ onSelectCase }) => {
   const [escalations, setEscalations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const fetchEscalations = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch('/api/escalations');
-      if (res.ok) {
-        const data = await res.json();
-        setEscalations(data.escalations || []);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setEscalations(data.escalations || []);
     } catch (err) {
       console.error('Failed to load escalations:', err);
+      setError('Unable to load escalation records. Please refresh.');
     } finally {
       setLoading(false);
     }
@@ -76,6 +78,8 @@ export const EscalationsView: React.FC<EscalationsViewProps> = ({ onSelectCase }
           <RefreshCw className="h-4 w-4 animate-spin text-blue-400" />
           <span>Loading escalations...</span>
         </div>
+      ) : error ? (
+        <div className="flex flex-col items-center gap-3 py-8 text-center text-xs text-rose-300"><span>{error}</span><button onClick={fetchEscalations} className="rounded-lg border border-rose-500/40 px-3 py-1.5 font-semibold hover:bg-rose-950/30">Retry</button></div>
       ) : pendingList.length === 0 ? (
         <div className="py-8 text-center text-xs text-[#98A2B3]">
           No pending escalations. All transactions within autonomous guardrail boundaries.

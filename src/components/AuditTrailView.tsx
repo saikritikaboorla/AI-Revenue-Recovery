@@ -38,6 +38,7 @@ const STAGE_CONFIG: Record<StageKey, { dot: string; badge: string; label: string
 const RESULT_CONFIG: Record<string, { cls: string; icon: React.ReactNode }> = {
   SUCCESS:   { cls: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30', icon: <CheckCircle2 className="h-3 w-3" /> },
   ESCALATED: { cls: 'text-amber-400 bg-amber-500/10 border-amber-500/30',       icon: <AlertTriangle className="h-3 w-3" /> },
+  NOT_RECOVERED: { cls: 'text-slate-300 bg-slate-500/10 border-slate-500/30',   icon: <Clock className="h-3 w-3" /> },
   FAILED:    { cls: 'text-rose-400 bg-rose-500/10 border-rose-500/30',          icon: <XCircle className="h-3 w-3" /> },
   BLOCKED:   { cls: 'text-orange-400 bg-orange-500/10 border-orange-500/30',    icon: <XCircle className="h-3 w-3" /> },
 };

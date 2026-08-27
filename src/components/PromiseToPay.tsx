@@ -131,7 +131,7 @@ export const PromiseToPay: React.FC<PromiseToPayProps> = ({ onSelectCase }) => {
             </h3>
           </div>
           <p className="text-xs text-[#98A2B3] mt-1 ml-9">
-            B2B structured payment commitments negotiated via AI agent — track fulfilment, verify settlement, and enforce escalation on broken promise.
+            Prototype demo commitments — track fulfilment, verify settlement, and enforce escalation on broken promise.
           </p>
         </div>
 

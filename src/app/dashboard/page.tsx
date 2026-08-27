@@ -108,6 +108,7 @@ export default function DashboardPage() {
   const [metrics, setMetrics] = useState<any>(null);
   const [cases, setCases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dataError, setDataError] = useState<string | null>(null);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
@@ -150,6 +151,7 @@ export default function DashboardPage() {
   // ── Data fetching ──────────────────────────────────────────────────────
   const fetchData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
+    setDataError(null);
     try {
       const [mRes, cRes] = await Promise.all([
         fetch('/api/metrics'),
@@ -162,6 +164,7 @@ export default function DashboardPage() {
       setCases(cData.cases || []);
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
+      setDataError('Unable to load dashboard data. Please use Sync Ledger to retry.');
       addToast('error', 'Failed to refresh data. Check your connection.');
     } finally {
       setLoading(false);
@@ -260,6 +263,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Metrics Overview ──────────────────────────────────────────── */}
+        {dataError && <div role="alert" className="rounded-xl border border-rose-500/35 bg-rose-950/20 px-4 py-3 text-sm text-rose-200">{dataError}</div>}
         <MetricsOverview metrics={metrics} loading={loading} onVerifiedClick={() => setShowLedgerProof(true)} />
 
         {/* ── Tab Bar ───────────────────────────────────────────────────── */}

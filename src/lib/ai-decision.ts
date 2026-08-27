@@ -1,5 +1,6 @@
 import type { GuardrailPolicy, RecoveryCaseRecord, CustomerRecord } from './db';
 import { PlaybookConfig, PlaybookType, PLAYBOOK_CONFIGS } from './playbooks';
+import { formatRetryStatus } from './guardrails';
 
 export type DecisionSignal = 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL';
 export type ConfidenceBand = 'HIGH' | 'MEDIUM' | 'LOW';
@@ -50,6 +51,9 @@ function issueLabel(failureReason: string, playbook?: PlaybookType): string {
   if (playbook === 'HINGLISH_RECOVERY') return 'Checkout drop-off / payment assistance';
   if (playbook === 'MANDATE_RETRY') return 'Mandate retry timing issue';
   if (playbook === 'CHECKOUT_ABANDONMENT') return 'Checkout abandonment';
+  if (playbook === 'PAYMENT_DEGRADATION') return 'Payment degradation';
+  if (playbook === 'FAILED_SUBSCRIPTION') return 'Failed subscription or mandate';
+  if (playbook === 'B2B_OVERDUE_RECEIVABLES') return 'Overdue receivable';
   if (playbook === 'PROMISE_TO_PAY') return 'Promise-to-pay settlement risk';
   const normalized = failureReason.toLowerCase();
   if (normalized.includes('timeout') || normalized.includes('downtime')) return 'Payment degradation';
@@ -104,12 +108,12 @@ export function createAIDecision(
   const factors: AIDecisionFactor[] = [
     { factor: 'Payment history', signal: historyRate >= 65 ? 'POSITIVE' : historyRate >= 40 ? 'NEUTRAL' : 'NEGATIVE', value: historyRate, evidence: customer ? `${historyRate}% historical recovery rate for ${customer.segment.replace(/_/g, ' ')} customer.` : 'Customer history unavailable in the case record.' },
     { factor: 'Failure type', signal: /TIMEOUT|DOWNTIME|DROPOFF|EXPIRATION/i.test(recCase.failure_reason) ? 'POSITIVE' : 'NEUTRAL', value: /TIMEOUT|DOWNTIME|DROPOFF|EXPIRATION/i.test(recCase.failure_reason) ? 1 : 0, evidence: `${issueLabel(recCase.failure_reason)} classified from ${recCase.failure_reason}.` },
-    { factor: 'Retry availability', signal: retryLimit ? 'POSITIVE' : 'NEGATIVE', value: Math.max(0, (config?.maxRetries || guardrails.maxRetries) - recCase.retry_count), evidence: `${recCase.retry_count} of ${config?.maxRetries || guardrails.maxRetries} attempts used.` },
+    { factor: 'Retry availability', signal: retryLimit ? 'POSITIVE' : 'NEGATIVE', value: Math.max(0, (config?.maxRetries || guardrails.maxRetries) - recCase.retry_count), evidence: `${formatRetryStatus(recCase.retry_count, config?.maxRetries || guardrails.maxRetries)} attempts.` },
     { factor: 'Risk threshold', signal: riskAllowed ? 'POSITIVE' : 'NEGATIVE', value: riskScore, evidence: `Risk ${riskScore}/100 versus autonomous ceiling ${guardrails.maxRiskScoreForAutonomousAction}.` },
     { factor: 'Amount threshold', signal: amountAllowed ? 'POSITIVE' : 'NEGATIVE', value: recCase.amount, evidence: `At-risk amount ₹${recCase.amount.toLocaleString('en-IN')} versus ceiling ₹${guardrails.highValueThreshold.toLocaleString('en-IN')}.` },
   ];
   const checks: AIGuardrailCheck[] = [
-    { name: 'Retry limit', status: retryLimit ? 'PASS' : 'ESCALATE', value: `${recCase.retry_count}/${config?.maxRetries || guardrails.maxRetries}`, reason: retryLimit ? 'Retry budget remains available.' : 'Retry limit exceeded.' },
+    { name: 'Retry limit', status: retryLimit ? 'PASS' : 'ESCALATE', value: formatRetryStatus(recCase.retry_count, config?.maxRetries || guardrails.maxRetries), reason: retryLimit ? 'Retry budget remains available.' : 'Retry limit exceeded.' },
     { name: 'Cooldown period', status: 'PASS', value: `${guardrails.cooldownHours}h policy`, reason: 'No cooldown violation is recorded by the current case state.' },
     { name: 'Risk threshold', status: riskAllowed ? 'PASS' : 'ESCALATE', value: `${riskScore}/100`, reason: riskAllowed ? 'Risk is within autonomous ceiling.' : 'Risk exceeds autonomous ceiling.' },
     { name: 'Amount threshold', status: amountAllowed ? 'PASS' : 'ESCALATE', value: `₹${recCase.amount.toLocaleString('en-IN')}`, reason: amountAllowed ? 'Amount is within autonomous action ceiling.' : 'High-value case requires human review.' },

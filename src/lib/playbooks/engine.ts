@@ -1,6 +1,7 @@
 import { db, RecoveryCaseRecord, AuditRecord, RecoveryLedgerRecord, EscalationRecord } from '../db';
 import { PlaybookType, PLAYBOOK_CONFIGS } from './index';
 import { createAIDecision } from '../ai-decision';
+import { formatRetryStatus } from '../guardrails';
 
 export interface ExecutionResult {
   success: boolean;
@@ -135,7 +136,7 @@ export class RecoveryPipeline {
       recCase.requires_human_approval = true;
       
       let escReason = 'Guardrail trigger: ';
-      if (!retryLimitPassed) escReason += `Max retries (${recCase.retry_count}/${guardrails.maxRetries}) reached. `;
+      if (!retryLimitPassed) escReason += `${formatRetryStatus(recCase.retry_count, config?.maxRetries || guardrails.maxRetries)}. `;
       if (!riskThresholdPassed) escReason += `Risk score (${recCase.customer_risk_score}) exceeds ceiling (${guardrails.maxRiskScoreForAutonomousAction}). `;
       if (!valueCeilingPassed) escReason += `Amount (₹${recCase.amount.toLocaleString('en-IN')}) exceeds high-value threshold (₹${guardrails.highValueThreshold.toLocaleString('en-IN')}). `;
 
@@ -273,7 +274,7 @@ export class RecoveryPipeline {
       if (recCase.retry_count >= guardrails.maxRetries) {
         recCase.status = 'ESCALATED';
         recCase.current_step = 'ESCALATED_MAX_RETRIES';
-        recCase.escalation_reason = `Maximum retry attempts (${recCase.retry_count}/${guardrails.maxRetries}) exhausted.`;
+        recCase.escalation_reason = `${formatRetryStatus(recCase.retry_count, config?.maxRetries || guardrails.maxRetries)}.`;
         recCase.escalated_to = 'Commercial Operations Lead';
 
         const stopAudit: AuditRecord = {

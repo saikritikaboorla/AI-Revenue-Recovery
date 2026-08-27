@@ -3,6 +3,15 @@ import path from 'path';
 import { PlaybookType, PLAYBOOK_CONFIGS } from '../playbooks';
 import type { AIDecisionRecord } from '../ai-decision';
 
+const DEFAULT_GUARDRAILS: GuardrailPolicy = {
+  maxRetries: 3,
+  cooldownHours: 0.25,
+  maxRiskScoreForAutonomousAction: 65,
+  highValueThreshold: 100000,
+  dailyContactLimit: 2,
+  enableVoiceAiForEnterpriseOnly: false,
+};
+
 export interface CustomerRecord {
   id: string;
   name: string;
@@ -66,7 +75,7 @@ export interface AuditRecord {
   stage: 'DETECT' | 'DIAGNOSE' | 'DECIDE_PLAYBOOK' | 'CHECK_GUARDRAILS' | 'EXECUTE_ACTION' | 'VERIFY' | 'STOP_OR_ESCALATE';
   actor: string;
   action: string;
-  result: 'SUCCESS' | 'FAILED' | 'ESCALATED' | 'BLOCKED';
+  result: 'SUCCESS' | 'FAILED' | 'ESCALATED' | 'BLOCKED' | 'NOT_RECOVERED';
   details: string;
   metadata?: Record<string, unknown>;
 }
@@ -112,14 +121,7 @@ export class DatabaseService {
   private audits: AuditRecord[] = [];
   private escalations: Map<string, EscalationRecord> = new Map();
   private promises: Map<string, PromiseRecord> = new Map();
-  private guardrails: GuardrailPolicy = {
-    maxRetries: 3,
-    cooldownHours: 0.25,
-    maxRiskScoreForAutonomousAction: 65,
-    highValueThreshold: 100000,
-    dailyContactLimit: 2,
-    enableVoiceAiForEnterpriseOnly: false
-  };
+  private guardrails: GuardrailPolicy = { ...DEFAULT_GUARDRAILS };
   private isLoaded: boolean = false;
 
   private constructor() {
@@ -272,7 +274,10 @@ export class DatabaseService {
         });
       });
 
-      // Load Audits
+      // Load Audits. Older demo rows used FAILED for every non-successful
+      // VERIFY/STOP_OR_ESCALATE stage. Reclassify those rows from the
+      // persisted case and ledger state so expected outcomes remain distinct
+      // from genuine execution failures.
       const auditRows = parseCSV(path.join(seedDir, 'audit_log.csv'));
       this.audits = auditRows.map(a => ({
         id: a.id,
@@ -281,14 +286,62 @@ export class DatabaseService {
         stage: a.stage as any,
         actor: a.actor,
         action: a.action,
-        result: a.result as any,
+        result: this.classifySeedAuditResult(a, this.cases.get(a.case_id)),
         details: a.details
       }));
+
+      // Complete legacy seed case state from its audit record. The original
+      // CSV cases predate last_action persistence, but the audit and ledger
+      // records are the authoritative evidence for what actually happened.
+      for (const recCase of this.cases.values()) {
+        const caseAudits = this.audits.filter(a => a.case_id === recCase.id);
+        if (caseAudits.some(a => a.stage === 'EXECUTE_ACTION')) {
+          recCase.last_action = recCase.last_action || PLAYBOOK_CONFIGS[recCase.playbook]?.allowedActions[0];
+        }
+        if (!recCase.last_action_result && caseAudits.some(a => a.stage === 'VERIFY')) {
+          recCase.last_action_result = recCase.status === 'RECOVERED'
+            ? `Verified settlement of ₹${recCase.amount.toLocaleString('en-IN')}`
+            : 'Provider response recorded; settlement pending verification.';
+        }
+      }
 
       this.isLoaded = true;
     } catch (err) {
       console.warn('CSV Seed Loading Notice:', err);
     }
+  }
+
+  private classifySeedAuditResult(
+    row: { stage: string; result: string; action: string; details: string },
+    recCase?: RecoveryCaseRecord,
+  ): AuditRecord['result'] {
+    if (!recCase) return row.result as AuditRecord['result'];
+
+    const hasSettlement = recCase.status === 'RECOVERED'
+      || this.ledgerHasCase(recCase.id);
+    const isExplicitFailure = row.result === 'FAILED'
+      && /error|exception|system failure|execution failure/i.test(`${row.action} ${row.details}`);
+    if (row.stage === 'VERIFY') {
+      if (isExplicitFailure) return 'FAILED';
+      return hasSettlement ? 'SUCCESS' : 'NOT_RECOVERED';
+    }
+    if (row.stage === 'STOP_OR_ESCALATE') {
+      if (recCase.status === 'ESCALATED') return 'ESCALATED';
+      if (recCase.status === 'RECOVERED') return 'SUCCESS';
+      if (recCase.status.startsWith('STOPPED')) return 'BLOCKED';
+      if (isExplicitFailure) return 'FAILED';
+      return 'BLOCKED';
+    }
+
+    // Preserve FAILED only when the source explicitly describes an error.
+    return row.result === 'FAILED' ? (isExplicitFailure ? 'FAILED' : 'BLOCKED') : row.result as AuditRecord['result'];
+  }
+
+  private ledgerHasCase(caseId: string): boolean {
+    for (const entry of this.ledger.values()) {
+      if (entry.case_id === caseId && entry.recovered_amount > 0) return true;
+    }
+    return false;
   }
 
   public getDashboardMetrics() {
@@ -473,6 +526,7 @@ export class DatabaseService {
     this.audits = [];
     this.escalations.clear();
     this.promises.clear();
+    this.guardrails = { ...DEFAULT_GUARDRAILS };
     this.seedFromCSV();
   }
 }

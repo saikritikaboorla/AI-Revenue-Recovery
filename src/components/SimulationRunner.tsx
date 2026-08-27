@@ -20,6 +20,7 @@ import confetti from 'canvas-confetti';
 interface SimulateApiResult {
   batchId: string;
   totalProcessed?: number;
+  totalCases?: number;
   totalCasesGenerated?: number;
   recoveredCount?: number;
   totalAtRisk?: number;
@@ -213,7 +214,7 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
   // Derived result values normalising both API response shapes
   const atRisk      = lastResult ? (lastResult.totalAtRisk      ?? lastResult.totalValueAtRisk      ?? 0) : 0;
   const recovered   = lastResult ? (lastResult.totalRecovered   ?? lastResult.totalValueRecovered   ?? 0) : 0;
-  const totalCases  = lastResult ? (lastResult.totalProcessed   ?? lastResult.totalCasesGenerated   ?? 0) : 0;
+  const totalCases  = lastResult ? (lastResult.totalProcessed   ?? lastResult.totalCasesGenerated ?? lastResult.totalCases ?? 0) : 0;
   const latencyMs   = lastResult?.averageExecutionLatencyMs ?? null;
   const playbookDist = lastResult?.playbookDistribution ?? null;
   const predicted = lastResult ? (lastResult.predictedRecoverableValue ?? 0) : 0;

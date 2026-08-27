@@ -7,7 +7,7 @@ export function evaluateGuardrails(recCase: RecoveryCaseRecord, guardrails: Guar
 
   return {
     maxRetriesUnderLimit: retryLimitPassed,
-    retryCount: recCase.retry_count,
+    retryCount: Math.min(Math.max(recCase.retry_count, 0), maxRetries),
     maxRetriesAllowed: maxRetries,
     customerRiskScore: recCase.customer_risk_score,
     maxRiskScoreAllowed: guardrails.maxRiskScoreForAutonomousAction,
@@ -21,8 +21,15 @@ export function evaluateGuardrails(recCase: RecoveryCaseRecord, guardrails: Guar
 
 export function getGuardrailTrigger(checks: ReturnType<typeof evaluateGuardrails>): string | null {
   const triggers: string[] = [];
-  if (!checks.maxRetriesUnderLimit) triggers.push(`Retry limit (${checks.retryCount}/${checks.maxRetriesAllowed}) exhausted`);
+  if (!checks.maxRetriesUnderLimit) triggers.push(`MAX RETRIES REACHED (${checks.retryCount}/${checks.maxRetriesAllowed})`);
   if (!checks.riskScoreApproved) triggers.push(`Risk score (${checks.customerRiskScore}) exceeds ceiling (${checks.maxRiskScoreAllowed})`);
   if (!checks.valueApproved) triggers.push(`High financial exposure (₹${checks.amount.toLocaleString('en-IN')} exceeds ₹${checks.highValueThreshold.toLocaleString('en-IN')} threshold)`);
   return triggers.length ? triggers.join('; ') : null;
+}
+
+export function formatRetryStatus(retryCount: number, maxRetries: number): string {
+  const displayedCount = Math.min(Math.max(retryCount, 0), maxRetries);
+  return retryCount >= maxRetries
+    ? `MAX RETRIES REACHED (${displayedCount}/${maxRetries})`
+    : `${displayedCount}/${maxRetries}`;
 }

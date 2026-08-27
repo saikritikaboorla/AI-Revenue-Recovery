@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { PLAYBOOK_CONFIGS } from '@/lib/playbooks';
 import { createAIDecision } from '@/lib/ai-decision';
 import { evaluateGuardrails } from '@/lib/guardrails';
+import { formatRetryStatus } from '@/lib/guardrails';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,7 +62,7 @@ export async function GET(
       factor: 'Playbook Retry Headroom',
       impact: retryLimitPassed ? 'POSITIVE' : 'NEGATIVE',
       weight: 0.30,
-      description: `Attempt ${recCase.retry_count} of ${maxRetries} maximum allowed retries.`
+      description: `${formatRetryStatus(recCase.retry_count, maxRetries)} maximum allowed retries.`
     }
   ];
 
@@ -79,7 +80,7 @@ export async function GET(
     customerHistory: {
       segment: recCase.customer_segment,
       riskScore: recCase.customer_risk_score,
-      retryCount: recCase.retry_count,
+      retryCount: guardrailChecks.retryCount,
       maxRetries,
       pastRecoverySignal: `Historical segment and risk signals used; current case confidence ${recCase.recovery_confidence}%.`,
     },
