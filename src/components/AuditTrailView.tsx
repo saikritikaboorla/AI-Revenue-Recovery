@@ -65,6 +65,14 @@ function formatAbsolute(ts: string): string {
   }
 }
 
+function formatAuditDetails(value: string): string {
+  return value.replace(/(\d+)\/(\d+)/g, (_, attempt, maximum) => {
+    const used = Number(attempt);
+    const limit = Number(maximum);
+    return used > limit ? `retry limit exceeded (attempt ${used}; maximum ${limit})` : `${used} of ${limit}`;
+  });
+}
+
 function SkeletonRow() {
   return (
     <div className="flex gap-4 py-4 animate-pulse">
@@ -286,7 +294,7 @@ export const AuditTrailView: React.FC = () => {
                         )}
                       </div>
 
-                      <p className="text-xs text-[#CBD5E1] leading-relaxed">{event.details}</p>
+                      <p className="text-xs text-[#CBD5E1] leading-relaxed">{formatAuditDetails(event.details || '')}</p>
 
                       <div className="flex flex-wrap items-center gap-3">
                         <span className="flex items-center gap-1 text-[11px] text-[#98A2B3]">

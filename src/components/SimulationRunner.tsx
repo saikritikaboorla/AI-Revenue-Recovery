@@ -30,6 +30,7 @@ interface SimulateApiResult {
   verifiedRecoveredValue?: number;
   recoveryRatePct: number;
   escalatedCount: number;
+  failedCount?: number;
   playbookDistribution?: Record<string, number>;
   averageExecutionLatencyMs?: number;
   // Fields present on BatchSimulationResult
@@ -78,6 +79,8 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
   const [lastResult, setLastResult] = useState<SimulateApiResult | null>(null);
   const [progress, setProgress] = useState<number>(0);
   const [progressMessage, setProgressMessage] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Sync custom input with batchSize
@@ -117,6 +120,8 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
     if (isSimulating) return;
     setIsSimulating(true);
     setLastResult(null);
+    setErrorMessage(null);
+    setResetMessage(null);
     startFakeProgress();
 
     try {
@@ -160,20 +165,26 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
       clearProgressInterval();
       setProgress(0);
       setProgressMessage('Simulation failed. Please retry.');
+      setErrorMessage('The batch stopped before a complete report was returned. No partial result is shown as verified recovery. Please retry the simulation.');
     } finally {
       setIsSimulating(false);
     }
   };
 
   const resetData = async () => {
+    setErrorMessage(null);
+    setResetMessage(null);
     try {
-      await fetch('/api/cases', { method: 'DELETE' });
+      const response = await fetch('/api/cases', { method: 'DELETE' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       setLastResult(null);
       setProgress(0);
       setProgressMessage('');
       onSimulationComplete();
+      setResetMessage('Demo state reset: overview, analytics, escalations, promises, audit, and queue now reflect the seed state.');
     } catch (err) {
       console.error('Reset failed:', err);
+      setErrorMessage('Unable to reset demo state. Please retry; no local result state was cleared.');
     }
   };
 
@@ -208,6 +219,8 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
   const predicted = lastResult ? (lastResult.predictedRecoverableValue ?? 0) : 0;
   const stopped = lastResult?.stoppedCount ?? 0;
   const successful = lastResult?.recoveredCount ?? 0;
+  const escalated = lastResult?.escalatedCount ?? 0;
+  const failed = lastResult?.failedCount ?? Math.max(0, totalCases - successful - escalated);
   const decisionDistribution = lastResult?.decisionDistribution ?? {};
   const decisionFactors = lastResult?.decisionFactors ?? {};
 
@@ -346,6 +359,16 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
         </div>
       )}
 
+      {errorMessage && (
+        <div role="alert" className="flex items-start gap-3 rounded-xl border border-rose-500/35 bg-rose-950/20 p-4 text-sm text-rose-200">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+      {resetMessage && (
+        <div role="status" className="rounded-xl border border-cyan-500/25 bg-cyan-950/15 p-3 text-xs text-cyan-200">{resetMessage}</div>
+      )}
+
       {/* ── Completion Progress Bar (briefly shown at 100%) ── */}
       {progress === 100 && !isSimulating && lastResult && (
         <div className="space-y-1">
@@ -389,7 +412,7 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
           </div>
 
           {/* Metric cards grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
             {/* At Risk */}
             <div className="rounded-lg bg-[#10151F] border border-[#252D3A] p-3 space-y-0.5">
               <span className="text-[10px] uppercase tracking-wider text-[#98A2B3] flex items-center gap-1">
@@ -403,7 +426,7 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
             <div className="rounded-lg bg-[#10151F] border border-emerald-900/40 p-3 space-y-0.5">
               <span className="text-[10px] uppercase tracking-wider text-[#98A2B3] flex items-center gap-1">
                 <TrendingUp className="h-3 w-3 text-emerald-400" />
-                Recovered
+                Verified Recovered
               </span>
               <p className="text-base font-bold text-emerald-400">{formatINR(recovered)}</p>
             </div>
@@ -428,11 +451,15 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
                 <AlertTriangle className="h-3 w-3 text-cyan-400" />
                 Escalations
               </span>
-              <p className="text-base font-bold text-cyan-400">{lastResult.escalatedCount} cases</p>
+              <p className="text-base font-bold text-purple-300">{escalated} cases</p>
             </div>
             <div className="rounded-lg bg-[#10151F] border border-rose-900/30 p-3 space-y-0.5">
-              <span className="text-[10px] uppercase tracking-wider text-[#98A2B3]">Stopped / Successful</span>
-              <p className="text-base font-bold text-rose-300">{stopped} / {successful}</p>
+              <span className="text-[10px] uppercase tracking-wider text-[#98A2B3]">Stopped</span>
+              <p className="text-base font-bold text-rose-300">{stopped} cases</p>
+            </div>
+            <div className="rounded-lg bg-[#10151F] border border-rose-900/30 p-3 space-y-0.5">
+              <span className="text-[10px] uppercase tracking-wider text-[#98A2B3]">Failed / unrecoverable</span>
+              <p className="text-base font-bold text-rose-300">{failed} cases</p>
             </div>
           </div>
 

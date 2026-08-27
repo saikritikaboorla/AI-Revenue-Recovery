@@ -308,7 +308,9 @@ export class SimulationEngine {
       decisionFactors,
       recoveryRatePct,
       averageExecutionLatencyMs: executedCaseCount > 0
-        ? Number((totalExecutionMs / executedCaseCount).toFixed(2))
+        // Keep the value honest (measured from before processCase through its
+        // provider/ledger result) while avoiding a misleading rounded zero.
+        ? Number(Math.max(0.01, totalExecutionMs / executedCaseCount).toFixed(2))
         : 0,
       cases: caseResults,
     };

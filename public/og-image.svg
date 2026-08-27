@@ -1,0 +1,14 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#070A10"/>
+  <circle cx="910" cy="100" r="360" fill="#0B3D68" fill-opacity=".28"/>
+  <circle cx="230" cy="570" r="300" fill="#124A52" fill-opacity=".2"/>
+  <path d="M0 470C200 390 330 530 520 438C700 351 800 407 1200 260" stroke="#1B87A4" stroke-opacity=".35" stroke-width="2"/>
+  <path d="M0 505C220 425 350 565 535 472C730 374 865 428 1200 292" stroke="#56C4D4" stroke-opacity=".2" stroke-width="2"/>
+  <rect x="84" y="78" width="56" height="56" rx="14" fill="#2563EB" fill-opacity=".18" stroke="#60A5FA" stroke-opacity=".7"/>
+  <path d="M112 94L126 106L112 118L98 106L112 94Z" fill="#67E8F9"/>
+  <text x="168" y="115" fill="#F0F4FF" font-family="Arial, sans-serif" font-size="28" font-weight="700">RecoverAI</text>
+  <text x="84" y="260" fill="#F8FAFC" font-family="Arial, sans-serif" font-size="58" font-weight="800">REVENUE IS SLIPPING.</text>
+  <text x="84" y="330" fill="#67E8F9" font-family="Arial, sans-serif" font-size="58" font-weight="800">THE AGENT FINDS IT.</text>
+  <text x="88" y="402" fill="#B8C9DD" font-family="Arial, sans-serif" font-size="24">Detect risk · diagnose cause · act within guardrails · verify recovery</text>
+  <text x="88" y="548" fill="#6F8AA8" font-family="monospace" font-size="17" letter-spacing="2">AUTONOMOUS CLOSED-LOOP REVENUE RECOVERY</text>
+</svg>

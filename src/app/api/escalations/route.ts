@@ -14,7 +14,14 @@ export async function GET() {
     const maxRetries = PLAYBOOK_CONFIGS[recCase.playbook]?.maxRetries || guardrails.maxRetries;
     const trigger = getGuardrailTrigger(evaluateGuardrails(recCase, guardrails, maxRetries));
     // Older seed rows contain a generic reason; current guardrail results are authoritative.
-    return trigger ? { ...escalation, reason: trigger } : escalation;
+    return {
+      ...escalation,
+      // Recompute from the same guardrail evaluator used by the trace. Never
+      // surface the stale generic CSV reason when a case has a specific reason.
+      reason: trigger || recCase.escalation_reason || (escalation.status === 'PENDING'
+        ? 'Human approval required by the case policy; inspect the case trace for the recorded decision.'
+        : 'Historical escalation resolved; no current guardrail breach is active.'),
+    };
   });
   return NextResponse.json({ escalations, total: escalations.length });
 }

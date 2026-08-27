@@ -244,12 +244,12 @@ export default function LandingPage() {
 
           {/* Separate text blocks keep the product proposition editorial and readable. */}
           <p className="text-base sm:text-lg md:text-xl text-[#D7E2F2] font-normal max-w-3xl mx-auto leading-[1.8] tracking-[0.01em] mb-5">
-            An autonomous closed-loop AI agent that detects revenue at risk, diagnoses the cause, selects the optimal recovery playbook, executes bounded actions, verifies settlement, and records every recovered rupee.
+            Detect revenue risk. Diagnose the cause. Choose the right recovery playbook. Execute within guardrails. Verify the money.
           </p>
 
           {/* Supporting Trust Line */}
           <p className="text-sm sm:text-base text-[#93A7C3] font-medium max-w-2xl mx-auto leading-[1.75] tracking-[0.015em] mb-12 sm:mb-14">
-            Every recovery is verified, measured, and recorded in an auditable ledger.
+            Every recovery is measured and recorded in an auditable ledger.
           </p>
 
           {/* CTAs with 3D Depth */}
