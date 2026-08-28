@@ -168,8 +168,8 @@ export const Navbar: React.FC = () => {
           </div>
 
           {/* ── Right side controls ─────────────────────────────────────── */}
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/50 border border-emerald-500/25 text-emerald-400">
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/50 border border-emerald-500/25 text-emerald-400">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
@@ -179,11 +179,10 @@ export const Navbar: React.FC = () => {
 
             <Link
               href="/dashboard"
-              className="flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 px-3 py-1.5 text-[11px] font-semibold text-white transition-all duration-150 shadow-[0_0_16px_rgba(59,130,246,0.3)] hover:shadow-[0_0_22px_rgba(59,130,246,0.5)] whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 px-3.5 py-1.5 text-xs font-semibold text-white transition-all duration-150 shadow-[0_0_16px_rgba(59,130,246,0.35)] hover:shadow-[0_0_22px_rgba(59,130,246,0.55)] whitespace-nowrap"
             >
-              <Activity className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Open Command Center</span>
-              <span className="sm:hidden">Dashboard</span>
+              <Activity className="h-3.5 w-3.5 shrink-0 text-white" />
+              <span>Open Command Center</span>
             </Link>
 
             <button
