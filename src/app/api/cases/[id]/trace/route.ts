@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { PLAYBOOK_CONFIGS } from '@/lib/playbooks';
-import { getAIDecision } from '@/lib/ai-claude';
+import { getAIDecision } from '@/lib/ai-gemini';
 import { evaluateGuardrails } from '@/lib/guardrails';
 import { formatRetryStatus } from '@/lib/guardrails';
 import { buildHinglishTranscript } from '@/lib/hinglish-engine';
@@ -12,6 +12,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  await db.ensureDurableState();
   const { id } = await params;
   const recCase = db.getCaseById(id);
   if (!recCase) {
@@ -19,7 +20,7 @@ export async function GET(
   }
 
   const guardrails = db.getGuardrails();
-  const config = PLAYBOOK_CONFIGS[recCase.playbook];
+  const seededConfig = PLAYBOOK_CONFIGS[recCase.playbook];
   const ledgerEntries = db.getLedgerEntriesByCaseId(id);
   const promise = db.getPromiseByCaseId(id);
   const hinglishTranscript = recCase.playbook === 'HINGLISH_RECOVERY' ? buildHinglishTranscript(recCase) : null;
@@ -37,15 +38,20 @@ export async function GET(
       case_id: id,
       timestamp: aiDecision.timestamp,
       stage: 'DECIDE_PLAYBOOK',
-      actor: aiDecision.source === 'CLAUDE_AI' ? 'CLAUDE_AI_DIAGNOSIS_ENGINE' : 'RECOVERAI_DECISION_ENGINE',
+      actor: aiDecision.source === 'GEMINI_AI' ? 'GEMINI_DIAGNOSIS_ENGINE' : 'RECOVERAI_DECISION_ENGINE',
       action: aiDecision.aiFallbackUsed ? 'DECISION_FALLBACK' : 'AUTOMATED_DECISION_REQUESTED',
       result: aiDecision.escalationRequired ? 'ESCALATED' : 'DECIDED',
       details: aiDecision.aiFallbackUsed
         ? `Deterministic fallback used (${aiDecision.aiFallbackReason}). ${aiDecision.detectedIssue}. ${aiDecision.expectedOutcome}`
-        : `[AI: ${aiDecision.aiProvider ?? 'Claude'} / ${aiDecision.aiModel}] ${aiDecision.detectedIssue}. ${aiDecision.expectedOutcome}`,
+        : `[AI: ${aiDecision.aiProvider ?? 'Gemini'} / ${aiDecision.aiModel}] ${aiDecision.detectedIssue}. ${aiDecision.expectedOutcome}`,
       metadata: { aiDecision },
     });
+    await db.flushDurableState();
   }
+  const effectivePlaybook = aiDecision.selectedPlaybook !== 'HUMAN_ESCALATION' && aiDecision.selectedPlaybook in PLAYBOOK_CONFIGS
+    ? aiDecision.selectedPlaybook
+    : recCase.playbook;
+  const config = PLAYBOOK_CONFIGS[effectivePlaybook] || seededConfig;
   const audits = db.getAuditsByCaseId(id);
 
   // Real guardrail check evaluation
@@ -85,6 +91,7 @@ export async function GET(
     factors,
     playbookConfig: config,
     aiDecision,
+    decisionSource: aiDecision.source === 'GEMINI_AI' && !aiDecision.aiFallbackUsed ? 'Gemini' : 'Deterministic fallback',
     candidatePlaybooks: aiDecision.candidateActions.map(candidate => ({ ...candidate, score: candidate.estimatedProbability, label: candidate.action.replace(/_/g, ' ') })),
     customerHistory: {
       segment: recCase.customer_segment,
@@ -120,7 +127,7 @@ export async function GET(
       },
       {
         stage: 'PLAYBOOK_SELECTED',
-        details: `${recCase.playbook} selected${recCase.rationale ? `: ${recCase.rationale}` : ''}.`,
+        details: `${effectivePlaybook} selected by ${aiDecision.source === 'GEMINI_AI' && !aiDecision.aiFallbackUsed ? 'Gemini' : 'deterministic fallback'}${recCase.rationale ? `: ${recCase.rationale}` : ''}.`,
       },
       {
         stage: 'GUARDRAILS',

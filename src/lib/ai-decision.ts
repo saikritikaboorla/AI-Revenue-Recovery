@@ -44,8 +44,8 @@ export interface AIDecisionRecord {
   escalationRequired: boolean;
   confidence: ConfidenceBand;
   confidencePercent: number;
-  // AI source metadata — set by ai-claude.ts
-  source: 'DETERMINISTIC_LOCAL_DECISION_ENGINE' | 'CLAUDE_AI';
+  // AI source metadata — set by ai-gemini.ts
+  source: 'DETERMINISTIC_LOCAL_DECISION_ENGINE' | 'GEMINI_AI';
   aiProvider?: string;
   aiModel?: string;
   aiRootCause?: string;

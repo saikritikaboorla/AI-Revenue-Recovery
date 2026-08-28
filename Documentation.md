@@ -7,7 +7,7 @@ not a description of a future architecture.
 ## 1. Executive summary
 
 RecoverAI is a Next.js prototype for demonstrating bounded AI-assisted
-revenue-recovery workflows. It uses a real server-side Claude LLM call for
+revenue-recovery workflows. It uses a real server-side Google Gemini LLM call for
 case diagnosis and playbook recommendation, followed by fully deterministic
 guardrail evaluation and bounded recovery execution. The Batch Simulator
 produces measurable outcomes, the Case Trace exposes the AI decision and
@@ -15,7 +15,8 @@ guardrail path with actual model output, and the Audit view makes the
 workflow inspectable.
 
 It is not yet a production collections or payment platform. Runtime state is
-an in-memory singleton, detection is seed/simulation based, provider actions
+an in-process cache backed by a private shared runtime document in production,
+detection is seed/simulation based, provider actions
 default to a mock adapter, and there is no authentication or live webhook
 ingestion.
 
@@ -28,13 +29,13 @@ ingestion.
 | Landing page | Explains the loop, seven playbooks, bounded recovery, guardrails, and verified recovery value. |
 | Overview / Command Center | Reads dashboard KPIs and recent recovery activity from the server database service. |
 | Recovery Queue | Filters/searches cases, displays status and recovery value, and opens Case Trace or starts recovery. |
-| Case Trace | Displays an "AI Decision Evidence" panel with real Claude model output (root cause, recommended playbook, reasoning, key signals, raw response). Shows AI-ASSISTED or DETERMINISTIC FALLBACK label. Guardrails, settlement proof, and ledger entries are separately deterministic. Hinglish includes a `SIMULATED` voice preview. |
+| Case Trace | Displays an "AI Decision Evidence" panel with real Gemini model output (root cause, recommended playbook, reasoning, key signals, raw response). Shows GEMINI or DETERMINISTIC FALLBACK label. Guardrails, settlement proof, and ledger entries are separately deterministic. Hinglish includes a `SIMULATED` voice preview. |
 | Analytics | Displays charted recovery totals and playbook/category breakdowns from metrics. |
 | Batch Simulator | Generates 1–100 cases, processes them through the AI + pipeline, and reports recovered, escalated, failed, at-risk values, plus AI-assisted vs deterministic fallback decision counts. |
 | Escalations | Shows pending human approvals and supports approve/reject actions. |
 | Promise-to-Pay | Supports create, reminder, reschedule, kept, and broken actions. Kept commitments settle through the canonical ledger path. |
 | Guardrails | Supports current-session policy changes for retries, cooldowns, risk/value thresholds, contact limits, and voice policy. |
-| Audit | Shows append-only pipeline events and outcome badges. AI decisions are recorded with `CLAUDE_AI_DIAGNOSIS_ENGINE` actor. |
+| Audit | Shows append-only pipeline events and outcome badges. AI decisions are recorded with `GEMINI_DIAGNOSIS_ENGINE` actor. |
 
 ### Implemented playbooks
 
@@ -48,7 +49,7 @@ The data model contains seven playbook types:
 6. Hinglish Recovery
 7. Promise-to-Pay
 
-The Claude model receives these 7 playbook types in its prompt and must
+The Gemini model receives these 7 playbook types in its prompt and must
 recommend exactly one. The model cannot invent new playbooks or actions.
 
 ## 3. Actual workflow
@@ -56,7 +57,7 @@ recommend exactly one. The model cannot invent new playbooks or actions.
 ```text
 case signal
 → detect
-→ AI diagnosis (Claude API, server-side)
+→ AI diagnosis (Gemini API, server-side)
   → validate recommended playbook against 7 known types
   → on failure: deterministic fallback
 → deterministic guardrail evaluation (retry, risk, amount, cooldown)
@@ -70,11 +71,11 @@ case signal
 
 ### AI call details
 
-- **Function:** `getAIDecision()` in `src/lib/ai-claude.ts`
-- **SDK:** `@anthropic-ai/sdk@0.39.0`
-- **Model:** `claude-3-5-haiku-20241022`
-- **Transport:** HTTPS to `api.anthropic.com` — server-side only
-- **Key:** `ANTHROPIC_API_KEY` environment variable — never client-side
+- **Function:** `getAIDecision()` in `src/lib/ai-gemini.ts`
+- **SDK:** `@google/genai`
+- **Model:** `gemini-3.6-flash`
+- **Transport:** Gemini API — server-side only
+- **Key:** `GEMINI_API_KEY` environment variable — never client-side
 - **Input:** case failure reason, amount, segment, risk score, retry count,
   historical recovery rate, guardrail policy (context only), full list of
   7 playbook types
@@ -84,7 +85,7 @@ case signal
 
 ### Fallback
 
-If the Claude call fails for any reason (missing key, timeout, API error,
+If the Gemini call fails for any reason (missing key, timeout, API error,
 malformed JSON, unsupported playbook), `getAIDecision()` catches the error,
 calls `createAIDecision()` (deterministic), sets `aiFallbackUsed: true` and
 `aiFallbackReason`, and returns normally. The pipeline is never interrupted.
@@ -119,17 +120,17 @@ Expected business outcomes:
 
 Every processed case trace shows an "AI Decision Evidence" panel:
 
-- **● AI-ASSISTED** badge when a real Claude call succeeded
-- **● DETERMINISTIC FALLBACK** badge when Claude failed and the fallback ran
-- Provider: Anthropic
-- Model: `claude-3-5-haiku-20241022`
+- **● GEMINI** badge when a real Gemini call succeeded
+- **● DETERMINISTIC FALLBACK** badge when Gemini failed and the fallback ran
+- Provider: Google Gemini
+- Model: `gemini-2.5-flash`
 - Root cause (from model)
 - Recommended playbook (validated against 7 fixed types)
 - Confidence (model-returned 0.0–1.0)
 - Reasoning (model text, specific to the case)
 - Key signals (model-returned array)
 - Timestamp of the model call
-- Raw model response (collapsed, actual JSON from Claude)
+- Raw model response (collapsed, actual JSON from Gemini)
 - AI vs Guardrails boundary notice
 
 ## 6. Hinglish disclosure
@@ -151,13 +152,16 @@ The API is implemented as Next.js route handlers under `src/app/api/`.
 | Controls | `/api/escalations`, `/api/promises`, `/api/guardrails` |
 | Observability | `/api/audit`, `/api/health` |
 
-The CSV seed data lives in `data/seed/`. The server-side in-memory maps hold
-customers, cases, ledger entries, audits, escalations, promises, and policy.
-`DELETE /api/cases` restores the verified seed state.
+The CSV seed data lives in `data/seed/`. `DatabaseService` is the one source
+of truth for customers, cases, ledger entries, audits, escalations, promises,
+and policy. Development uses the runtime JSON file; production hydrates and
+flushes the same repository to one private Vercel Blob JSON document. This
+keeps simulator cases available when Queue and Trace requests reach different
+serverless instances. `DELETE /api/cases` restores the verified seed state.
 
 ## 8. Environment and security
 
-`ANTHROPIC_API_KEY` is read server-side only from the environment variable.
+`GEMINI_API_KEY` is read server-side only from the environment variable.
 It is never set as `NEXT_PUBLIC_*`, never logged, and never sent to the
 browser. The model prompt contains case context but no API credentials.
 
@@ -178,7 +182,7 @@ The following checks were performed against the implemented app:
 - Fresh simulator batch: recovered cases had `status = RECOVERED`, non-zero
   verified amount, one ledger entry, and settlement proof. Unrecovered cases
   had zero verified amount and no ledger entries.
-- AI source tracking: batch results report `aiAssistedCount` (real Claude
+- AI source tracking: batch results report `aiAssistedCount` (real Gemini
   calls) and `fallbackCount` (deterministic fallback) derived from the actual
   `ai_decision.source` and `aiFallbackUsed` fields per case.
 - Escalation semantics: guardrail-blocked cases produce `ESCALATED` audit
@@ -191,9 +195,9 @@ The following checks were performed against the implemented app:
 | Requirement | Assessment |
 |---|---|
 | Detect revenue at risk | **Demonstrated in prototype scope.** Seeded cases and synthetic batches cover all 7 playbook types. No live webhook ingestion. |
-| Determine the right intervention | **Demonstrated with real AI.** Claude diagnoses each case and recommends a playbook. The deterministic engine validates and enforces guardrails. |
+| Determine the right intervention | **Demonstrated with real AI.** Gemini diagnoses each case and recommends a playbook. The deterministic engine validates and enforces guardrails. |
 | Execute a bounded recovery workflow | **Demonstrated.** Guardrails, allowed playbook actions, escalation, verification, ledger write, and audit trail are implemented. |
-| AI-assisted diagnosis | **Implemented.** Real Claude API call in `src/lib/ai-claude.ts`. Validated structured output. Deterministic fallback if Claude fails. |
+| AI-assisted diagnosis | **Implemented.** Real Gemini API call in `src/lib/ai-gemini.ts`. Validated structured output. Deterministic fallback if Gemini fails. |
 | Payment degradation | **Demonstrated as a mock/simulated provider workflow.** |
 | Checkout drop-off | **Demonstrated as a bounded simulated action.** |
 | Failed subscription | **Demonstrated as a bounded simulated action.** |

@@ -27,6 +27,7 @@ type Trace = {
   proof: { amountAtRisk: number; predictedRecoverable: number; verifiedRecovered: number; verificationSource: string };
   finalOutcome?: string;
   stageStory?: Array<{ stage: string; details: string }>;
+  decisionSource?: 'AI' | 'Deterministic fallback';
   aiDecision: {
     riskScore: number;
     recoveryProbability: number;
@@ -115,7 +116,7 @@ export const DecisionTraceModal: React.FC<{ caseId: string | null; onClose: () =
       <header className="flex items-start justify-between gap-4 border-b border-[#233149] bg-gradient-to-r from-[#101d31] to-[#0b111d] px-5 py-5 sm:px-8"><div className="flex gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-blue-400/30 bg-blue-400/10 text-blue-300"><Activity /></div><div><p className="text-xs font-mono uppercase tracking-[.22em] text-blue-300">Automated Decision · Case Intelligence</p><h2 className="mt-1 text-xl font-extrabold text-white sm:text-2xl">CASE #{caseId}</h2>{c && <p className="mt-1 text-sm text-slate-400">{c.customer_name} · {pretty(c.playbook)} · {pretty(c.failure_reason)}</p>}</div></div><button onClick={onClose} aria-label="Close case intelligence" className="rounded-xl p-2 text-slate-400 hover:bg-white/5 hover:text-white"><X /></button></header>
       {loading && !c ? <TraceSkeleton /> : error ? <div className="p-10 text-center text-rose-300">{error}<button onClick={load} className="ml-3 text-blue-300 underline">Retry</button></div> : c && trace && <div className="max-h-[78vh] space-y-7 overflow-y-auto p-5 sm:p-8">
         <div className="grid gap-3 sm:grid-cols-4"><Stat label="Revenue at risk" value={money(c.amount)} tone="yellow" /><Stat label="Risk score" value={`${trace.aiDecision.riskScore} / 100`} tone="red" /><Stat label="Estimated recovery probability" value={`${trace.aiDecision.confidencePercent}% · ${trace.aiDecision.confidence}`} tone="purple" /><Stat label="Verified recovered" value={money(trace.proof.verifiedRecovered)} tone="green" /></div>
-        <Panel title="Automated Decision" eyebrow="Diagnose → decide"><div className="grid gap-4 md:grid-cols-[1fr_auto]"><div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Detected issue</p><p className="mt-1 text-lg font-bold text-purple-200">{trace.aiDecision.detectedIssue}</p><p className="mt-3 text-sm leading-relaxed text-slate-300">{trace.aiDecision.diagnosis}</p></div><div className="rounded-2xl border border-purple-400/30 bg-purple-400/10 p-4 md:min-w-64"><p className="text-xs uppercase tracking-wider text-purple-200">Recommended playbook</p><p className="mt-2 text-lg font-extrabold text-white">{pretty(trace.aiDecision.selectedAction)}</p><p className="mt-2 text-sm font-semibold text-purple-100">{trace.aiDecision.confidencePercent}% confidence · {trace.aiDecision.confidence}</p><p className="mt-2 text-xs leading-relaxed text-slate-300">{trace.aiDecision.expectedOutcome}</p></div></div></Panel>
+        <Panel title="Automated Decision" eyebrow="Diagnose → decide"><div className="grid gap-4 md:grid-cols-[1fr_auto]"><div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Detected issue</p><p className="mt-1 text-lg font-bold text-purple-200">{trace.aiDecision.detectedIssue}</p><p className="mt-3 text-sm leading-relaxed text-slate-300">{trace.aiDecision.diagnosis}</p></div><div className="rounded-2xl border border-purple-400/30 bg-purple-400/10 p-4 md:min-w-64"><p className="text-xs uppercase tracking-wider text-purple-200">Recommended playbook</p><p className="mt-2 text-lg font-extrabold text-white">{pretty(trace.aiDecision.selectedPlaybook)}</p><p className="mt-2 text-xs font-semibold uppercase tracking-wider text-blue-200">Decision source: {trace.decisionSource ?? (trace.aiDecision.aiFallbackUsed ? 'Deterministic fallback' : 'AI')}</p><p className="mt-2 text-sm font-semibold text-purple-100">{trace.aiDecision.confidencePercent}% confidence · {trace.aiDecision.confidence}</p><p className="mt-2 text-xs leading-relaxed text-slate-300">{trace.aiDecision.expectedOutcome}</p></div></div></Panel>
         <AIEvidenceSection aiDecision={trace.aiDecision} />
         <div className="rounded-2xl border border-blue-400/25 bg-[#0e1726] p-4 sm:p-6"><div className="mb-5 flex items-center justify-between"><div><p className="text-xs font-mono uppercase tracking-[.2em] text-blue-300">Recovery lifecycle</p><h3 className="mt-1 text-lg font-bold text-white">Revenue risk → verified recovery</h3></div><span className="rounded-full border border-blue-400/25 bg-blue-400/10 px-3 py-1 text-xs text-blue-200">Active: {activeStage(trace)}</span></div><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">{stages.map(([key, label], index) => { const state = stageState(key, trace); const active = activeStage(trace) === key && state !== 'complete'; return <React.Fragment key={key}><div className={`rounded-xl border p-3 ${active ? 'border-blue-300/80 bg-blue-400/15 shadow-[0_0_18px_rgba(56,189,248,.18)]' : state === 'complete' ? 'border-emerald-400/40 bg-emerald-400/10' : state === 'blocked' ? 'border-purple-400/60 bg-purple-400/10' : 'border-slate-700 bg-slate-900/30'}`}><div className="flex items-center justify-between"><span className="text-[11px] font-mono font-bold text-slate-300">0{index + 1}</span>{active ? <Circle className="h-4 w-4 animate-pulse text-blue-300" /> : state === 'complete' ? <Check className="h-4 w-4 text-emerald-300" /> : state === 'blocked' ? <AlertTriangle className="h-4 w-4 text-purple-300" /> : <Clock3 className="h-4 w-4 text-slate-500" />}</div><p className="mt-3 text-xs font-bold uppercase tracking-wider text-white">{key}</p><p className="mt-1 text-xs leading-relaxed text-slate-400">{label}</p></div>{index < stages.length - 1 && <ChevronRight className="hidden self-center text-slate-600 lg:block" />}</React.Fragment>; })}</div></div>
         {trace.stageStory && <Panel title="Chronological Case Story" eyebrow="Backend-backed timeline"><div className="space-y-2">{trace.stageStory.map(entry => <div key={entry.stage} className="rounded-xl border border-[#26374d] bg-[#101927] p-3"><p className="text-[11px] font-mono uppercase tracking-[.18em] text-cyan-200">{entry.stage}</p><p className="mt-1 text-sm leading-relaxed text-slate-200">{entry.details}</p></div>)}</div></Panel>}
@@ -140,7 +141,7 @@ function Info({ label, value }: { label: string; value: string }) { return <div 
 
 function AIEvidenceSection({ aiDecision }: { aiDecision: Trace['aiDecision'] }) {
   const [rawOpen, setRawOpen] = useState(false);
-  const isAI = aiDecision.source === 'CLAUDE_AI' && !aiDecision.aiFallbackUsed;
+  const isAI = aiDecision.source === 'GEMINI_AI' && !aiDecision.aiFallbackUsed;
   const isFallback = aiDecision.aiFallbackUsed;
 
   return (
@@ -176,7 +177,7 @@ function AIEvidenceSection({ aiDecision }: { aiDecision: Trace['aiDecision'] }) 
           </p>
           <p className="mt-1 text-sm font-semibold text-white">
             {isAI
-              ? `${aiDecision.aiProvider ?? 'Anthropic'} / ${aiDecision.aiModel ?? 'claude-3-5-haiku-20241022'}`
+              ? `${aiDecision.aiProvider ?? 'Gemini'} / ${aiDecision.aiModel ?? 'gemini-3.6-flash'}`
               : 'Deterministic Rules Engine'}
           </p>
         </div>
@@ -240,7 +241,7 @@ function AIEvidenceSection({ aiDecision }: { aiDecision: Trace['aiDecision'] }) 
             className="flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-slate-200"
           >
             <ChevronRight className={`h-3 w-3 transition-transform ${rawOpen ? 'rotate-90' : ''}`} />
-            {rawOpen ? 'Hide' : 'Show'} Raw Model Response
+            {rawOpen ? 'Hide' : 'Show'} Structured Model Response
           </button>
           {rawOpen && (
             <pre className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-[#26374d] bg-[#060b14] p-3 text-[11px] leading-relaxed text-slate-300 whitespace-pre-wrap break-words">

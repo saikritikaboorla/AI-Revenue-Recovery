@@ -11,10 +11,12 @@ export async function POST(
 ) {
   const { id } = await params;
   try {
+    await db.ensureDurableState();
     const body = await request.json().catch(() => ({}));
     if (!isRecord(body)) throw new Error('A JSON object is required');
     const forceApproval = body.forceApproval === true;
     const result = await RecoveryPipeline.processCase(id, { forceApproval });
+    await db.flushDurableState();
     return NextResponse.json(result);
   } catch (err: any) {
     return NextResponse.json({ error: errorMessage(err, 'Workflow execution failed') }, { status: 400 });

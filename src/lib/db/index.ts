@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { get as getBlob, put as putBlob } from '@vercel/blob';
 import { PlaybookType, PLAYBOOK_CONFIGS } from '../playbooks';
 import type { AIDecisionRecord } from '../ai-decision';
 
@@ -13,6 +14,7 @@ const DEFAULT_GUARDRAILS: GuardrailPolicy = {
 };
 
 const RUNTIME_STATE_FILE = path.join(process.cwd(), '.cache', 'recoverai-runtime-state.json');
+const DURABLE_STATE_BLOB = 'recoverai-runtime-state.json';
 
 export interface CustomerRecord {
   id: string;
@@ -125,6 +127,7 @@ export class DatabaseService {
   private promises: Map<string, PromiseRecord> = new Map();
   private guardrails: GuardrailPolicy = { ...DEFAULT_GUARDRAILS };
   private isLoaded: boolean = false;
+  private durableStateLoad: Promise<void> | null = null;
 
   private constructor() {
     if (!this.loadRuntimeState()) {
@@ -155,6 +158,99 @@ export class DatabaseService {
     } catch (err) {
       console.warn('Runtime state persistence notice:', err);
     }
+  }
+
+  private serializeState(): string {
+    return JSON.stringify({
+      guardrails: this.guardrails,
+      customers: Array.from(this.customers.values()),
+      cases: Array.from(this.cases.values()),
+      ledger: Array.from(this.ledger.values()),
+      audits: this.audits,
+      escalations: Array.from(this.escalations.values()),
+      promises: Array.from(this.promises.values()),
+    });
+  }
+
+  private applyParsedState(parsed: Partial<{
+    guardrails: GuardrailPolicy;
+    customers: CustomerRecord[];
+    cases: RecoveryCaseRecord[];
+    ledger: RecoveryLedgerRecord[];
+    audits: AuditRecord[];
+    escalations: EscalationRecord[];
+    promises: PromiseRecord[];
+  }>, replace = false): void {
+    if (replace) {
+      if (parsed.guardrails) this.guardrails = parsed.guardrails;
+      if (parsed.customers) this.customers = new Map(parsed.customers.map(item => [item.id, item]));
+      if (parsed.cases) this.cases = new Map(parsed.cases.map(item => [item.id, item]));
+      if (parsed.ledger) this.ledger = new Map(parsed.ledger.map(item => [item.id, item]));
+      if (parsed.audits) this.audits = parsed.audits;
+      if (parsed.escalations) this.escalations = new Map(parsed.escalations.map(item => [item.id, item]));
+      if (parsed.promises) this.promises = new Map(parsed.promises.map(item => [item.id, item]));
+      return;
+    }
+
+    if (parsed.guardrails) this.guardrails = { ...this.guardrails, ...parsed.guardrails };
+    for (const item of parsed.customers || []) this.customers.set(item.id, this.customers.get(item.id) || item);
+    for (const item of parsed.cases || []) {
+      const current = this.cases.get(item.id);
+      if (!current || new Date(item.updated_at).getTime() >= new Date(current.updated_at).getTime()) this.cases.set(item.id, item);
+    }
+    for (const item of parsed.ledger || []) this.ledger.set(item.id, this.ledger.get(item.id) || item);
+    const auditIds = new Set(this.audits.map(item => item.id));
+    for (const item of parsed.audits || []) if (!auditIds.has(item.id)) this.audits.push(item);
+    for (const item of parsed.escalations || []) this.escalations.set(item.id, this.escalations.get(item.id) || item);
+    for (const item of parsed.promises || []) this.promises.set(item.id, this.promises.get(item.id) || item);
+  }
+
+  /**
+   * Hydrate the same repository from shared storage before a serverless
+   * request reads it. Local files remain the development fallback.
+   */
+  public async ensureDurableState(): Promise<void> {
+    if (!process.env.BLOB_READ_WRITE_TOKEN) return;
+    if (this.durableStateLoad) return this.durableStateLoad;
+    this.durableStateLoad = (async () => {
+      try {
+        const blob = await getBlob(DURABLE_STATE_BLOB, { access: 'private', useCache: false });
+        if (blob) {
+          const parsed = JSON.parse(await new Response(blob.stream).text()) as Partial<{
+            guardrails: GuardrailPolicy;
+            customers: CustomerRecord[];
+            cases: RecoveryCaseRecord[];
+            ledger: RecoveryLedgerRecord[];
+            audits: AuditRecord[];
+            escalations: EscalationRecord[];
+            promises: PromiseRecord[];
+          }>;
+          this.applyParsedState(parsed);
+        } else {
+          await this.flushDurableState();
+        }
+      } catch (error) {
+        console.warn('Shared runtime state hydration notice:', error instanceof Error ? error.message : 'unavailable');
+      } finally {
+        this.durableStateLoad = null;
+      }
+    })();
+    return this.durableStateLoad;
+  }
+
+  /** Flush the canonical repository after a request mutates it. */
+  public async flushDurableState(replace = false): Promise<void> {
+    if (!process.env.BLOB_READ_WRITE_TOKEN) return;
+    // Merge with the latest shared document so a warm serverless instance
+    // cannot overwrite cases created by another instance from a stale map.
+    const existing = await getBlob(DURABLE_STATE_BLOB, { access: 'private', useCache: false });
+    if (existing && !replace) {
+      const parsed = JSON.parse(await new Response(existing.stream).text()) as Parameters<DatabaseService['applyParsedState']>[0];
+      this.applyParsedState(parsed);
+    }
+    await putBlob(DURABLE_STATE_BLOB, this.serializeState(), {
+      access: 'private', allowOverwrite: true, contentType: 'application/json',
+    });
   }
 
   private loadRuntimeState(): boolean {

@@ -29,7 +29,7 @@ export interface BatchSimulationResult {
   decisionFactors: Record<string, number>;
   recoveryRatePct: number;
   averageExecutionLatencyMs: number;
-  /** Number of cases where a real Claude AI call succeeded */
+  /** Number of cases where a real Gemini AI call succeeded */
   aiAssistedCount: number;
   /** Number of cases where the deterministic fallback was used */
   fallbackCount: number;
@@ -277,7 +277,7 @@ export class SimulationEngine {
             if (factor.signal === 'POSITIVE') decisionFactors[factor.factor] = (decisionFactors[factor.factor] || 0) + 1;
           });
           // Track AI-assisted vs deterministic fallback
-          if (decision.source === 'CLAUDE_AI' && !decision.aiFallbackUsed) {
+          if (decision.source === 'GEMINI_AI' && !decision.aiFallbackUsed) {
             aiAssistedCount += 1;
           } else {
             fallbackCount += 1;

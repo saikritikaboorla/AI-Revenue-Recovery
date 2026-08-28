@@ -8,6 +8,7 @@ import { errorMessage, isRecord, requiredString } from '@/lib/api-validation';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  await db.ensureDurableState();
   const escalations = db.getEscalations().map(escalation => {
     const recCase = db.getCaseById(escalation.case_id);
     if (!recCase) return escalation;
@@ -28,6 +29,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  await db.ensureDurableState();
   try {
     const body = await req.json();
     if (!isRecord(body)) throw new Error('A JSON object is required');
@@ -59,9 +61,11 @@ export async function POST(req: NextRequest) {
         result: 'DECIDED',
         details: `Senior Operations Specialist approved autonomous execution for case ${caseId}. Guardrails overridden with human authority.`
       });
+      await db.flushDurableState();
 
       // Execute pipeline with force approval
       const pipelineResult = await RecoveryPipeline.processCase(caseId, { forceApproval: true });
+      await db.flushDurableState();
       return NextResponse.json({
         success: true,
         caseId,
@@ -84,6 +88,7 @@ export async function POST(req: NextRequest) {
         result: 'BLOCKED',
         details: `Senior Operations Specialist rejected recovery action for case ${caseId}. Workflow permanently stopped.`
       });
+      await db.flushDurableState();
 
       return NextResponse.json({
         success: true,

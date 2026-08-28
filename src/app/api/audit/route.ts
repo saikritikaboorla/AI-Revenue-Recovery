@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  await db.ensureDurableState();
   const { searchParams } = new URL(req.url);
   const caseId  = searchParams.get('case_id')  || undefined;
   const stage   = searchParams.get('stage')     || undefined;

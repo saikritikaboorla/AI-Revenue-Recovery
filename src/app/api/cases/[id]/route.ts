@@ -7,6 +7,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  await db.ensureDurableState();
   const { id } = await params;
   const recCase = db.getCaseById(id);
   if (!recCase) {

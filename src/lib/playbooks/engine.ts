@@ -1,10 +1,10 @@
 import { db, RecoveryCaseRecord, AuditRecord, EscalationRecord } from '../db';
 import { PlaybookType, PLAYBOOK_CONFIGS } from './index';
 import { createAIDecision } from '../ai-decision';
-import { getAIDecision } from '../ai-claude';
+import { getAIDecision } from '../ai-gemini';
 import { formatRetryStatus } from '../guardrails';
 
-const MODEL_LABEL = 'claude-3-5-haiku-20241022';
+const MODEL_LABEL = 'gemini-3.6-flash';
 
 export interface ExecutionResult {
   success: boolean;
@@ -56,10 +56,33 @@ export class RecoveryPipeline {
     }
 
     const guardrails = db.getGuardrails();
-    const config = PLAYBOOK_CONFIGS[recCase.playbook];
     const customer = db.getCustomerById(recCase.customer_id);
     const aiDecision = await getAIDecision(recCase, guardrails, customer);
     recCase.ai_decision = aiDecision;
+
+    // Resolve which playbook config to use for execution.
+    // If Gemini (AI) recommended a valid playbook that differs from the seeded one,
+    // and guardrails for that playbook are not more restrictive, use the AI
+    // recommendation to select the action. This makes Gemini's output genuinely
+    // influence the execution path (not just the trace display), while remaining
+    // bounded: the action must still be in the recommended playbook's allowedActions
+    // and all guardrail thresholds still apply independently.
+    const aiRecommendedPlaybook =
+      !aiDecision.aiFallbackUsed &&
+      aiDecision.selectedPlaybook !== 'HUMAN_ESCALATION' &&
+      aiDecision.selectedPlaybook in PLAYBOOK_CONFIGS
+        ? (aiDecision.selectedPlaybook as PlaybookType)
+        : null;
+
+    // Persist an accepted bounded recommendation as the case's effective
+    // playbook so queue, trace, settlement, ledger, and audit records agree.
+    // A guardrail-blocked recommendation remains unadopted and escalates.
+    if (aiRecommendedPlaybook) recCase.playbook = aiRecommendedPlaybook;
+
+    // Use the AI-recommended config when available; fall back to seeded playbook config.
+    const config = aiRecommendedPlaybook
+      ? PLAYBOOK_CONFIGS[aiRecommendedPlaybook]
+      : PLAYBOOK_CONFIGS[recCase.playbook];
 
     // Stage 0: Record DETECT if not present
     const existingAudits = db.getAuditsByCaseId(caseId);
@@ -79,18 +102,27 @@ export class RecoveryPipeline {
     }
 
     // Stage 1: DIAGNOSE & RISK SCORE
+    // Use Gemini's real diagnosis when available; fall back to deterministic summary.
     recCase.status = 'DIAGNOSING';
     recCase.current_step = 'DIAGNOSING';
-    
-    let diagnosis = `Analyzed root cause: ${recCase.failure_reason}. Customer risk score: ${recCase.customer_risk_score}/100. Segment: ${recCase.customer_segment}.`;
-    let rationale = `Selected Playbook [${config.displayName}] due to ${recCase.failure_reason}.`;
 
-    if (recCase.playbook === 'HINGLISH_RECOVERY') {
-      diagnosis += ' Customer dropped out during mobile UPI intent step. Hinglish conversational recovery matched.';
-      rationale = 'Dispatched bilingual (Hinglish) interactive payment prompt over WhatsApp Cloud API.';
-    } else if (recCase.playbook === 'PROMISE_TO_PAY') {
-      diagnosis += ' Deferred settlement schedule logged. Setting automated P2P calendar milestone.';
-      rationale = 'Recorded promise-to-pay commitment. Enforcing milestone verification before cooldown.';
+    const aiDiagnosisAvailable = !aiDecision.aiFallbackUsed && aiDecision.source === 'GEMINI_AI';
+    let diagnosis = aiDiagnosisAvailable
+      ? aiDecision.diagnosis
+      : `Analyzed root cause: ${recCase.failure_reason}. Customer risk score: ${recCase.customer_risk_score}/100. Segment: ${recCase.customer_segment}.`;
+
+    let rationale = aiDiagnosisAvailable
+      ? `AI-recommended playbook: ${config.displayName}. ${aiDecision.aiReasoning ?? ''}`
+      : `Selected Playbook [${config.displayName}] due to ${recCase.failure_reason}.`;
+
+    if (!aiDiagnosisAvailable) {
+      if (recCase.playbook === 'HINGLISH_RECOVERY') {
+        diagnosis += ' Customer dropped out during mobile UPI intent step. Hinglish conversational recovery matched.';
+        rationale = 'Dispatched bilingual (Hinglish) interactive payment prompt over WhatsApp Cloud API.';
+      } else if (recCase.playbook === 'PROMISE_TO_PAY') {
+        diagnosis += ' Deferred settlement schedule logged. Setting automated P2P calendar milestone.';
+        rationale = 'Recorded promise-to-pay commitment. Enforcing milestone verification before cooldown.';
+      }
     }
 
     recCase.diagnosis_summary = diagnosis;
@@ -101,7 +133,7 @@ export class RecoveryPipeline {
       case_id: recCase.id,
       timestamp: now,
       stage: 'DIAGNOSE',
-      actor: 'RECOVERAI_DIAGNOSTIC_RULES',
+      actor: aiDiagnosisAvailable ? 'GEMINI_DIAGNOSIS_ENGINE' : 'RECOVERAI_DIAGNOSTIC_RULES',
       action: 'DIAGNOSIS_FORMULATED',
       result: 'DIAGNOSED',
       details: diagnosis
@@ -114,12 +146,18 @@ export class RecoveryPipeline {
       case_id: recCase.id,
       timestamp: aiDecision.timestamp,
       stage: 'DECIDE_PLAYBOOK',
-      actor: aiDecision.source === 'CLAUDE_AI' ? 'CLAUDE_AI_DIAGNOSIS_ENGINE' : 'RECOVERAI_DECISION_ENGINE',
+      actor: aiDecision.source === 'GEMINI_AI' ? 'GEMINI_DIAGNOSIS_ENGINE' : 'RECOVERAI_DECISION_ENGINE',
       action: aiDecision.aiFallbackUsed ? 'DECISION_FALLBACK' : 'STRUCTURED_PLAYBOOK_DECISION',
       result: aiDecision.escalationRequired ? 'ESCALATED' : 'DECIDED',
       details: aiDecision.aiFallbackUsed
         ? `Deterministic fallback used (${aiDecision.aiFallbackReason}). ${aiDecision.detectedIssue}. ${aiDecision.expectedOutcome}`
-        : `[AI: ${aiDecision.aiProvider ?? 'Claude'} / ${aiDecision.aiModel ?? MODEL_LABEL}] ${aiDecision.detectedIssue}. Recommended: ${aiDecision.selectedPlaybook}. ${aiDecision.expectedOutcome}`,
+        : (() => {
+            const base = `[AI: ${aiDecision.aiProvider ?? 'Gemini'} / ${aiDecision.aiModel ?? MODEL_LABEL}] ${aiDecision.detectedIssue}. Recommended: ${aiDecision.selectedPlaybook}.`;
+            const playbookNote = aiRecommendedPlaybook && aiRecommendedPlaybook !== recCase.playbook
+              ? ` AI adopted playbook ${aiRecommendedPlaybook} (seeded: ${recCase.playbook}).`
+              : '';
+            return `${base}${playbookNote} ${aiDecision.expectedOutcome}`;
+          })(),
       metadata: { aiDecision },
     });
     generatedAudits.push(db.getAuditsByCaseId(caseId).slice(-1)[0]);

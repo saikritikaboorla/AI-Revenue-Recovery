@@ -41,7 +41,7 @@ interface SimulateApiResult {
   stoppedCount?: number;
   decisionDistribution?: Record<string, number>;
   decisionFactors?: Record<string, number>;
-  /** Number of cases processed by real AI (Claude) */
+  /** Number of cases processed by real AI (Gemini) */
   aiAssistedCount?: number;
   /** Number of cases that used deterministic fallback */
   fallbackCount?: number;

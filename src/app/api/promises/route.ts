@@ -5,6 +5,7 @@ import { errorMessage, isRecord, optionalDate, optionalFiniteNumber, requiredStr
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  await db.ensureDurableState();
   try {
     const promises = db.getPromises();
     return NextResponse.json({ promises, total: promises.length });
@@ -18,6 +19,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    await db.ensureDurableState();
     const body = await req.json().catch(() => null);
     if (!isRecord(body)) throw new Error('A JSON object is required');
     const { caseId, action, promiseDate, amount, channel } = body as {
@@ -78,6 +80,7 @@ export async function POST(req: NextRequest) {
           result: 'ACTION_EXECUTED',
           details: `Formal promise-to-pay registered: ₹${pAmt.toLocaleString('en-IN')} committed for settlement on ${pDate} via ${pChan}.`
         });
+        await db.flushDurableState();
 
         return NextResponse.json({
           success: true,
@@ -91,6 +94,7 @@ export async function POST(req: NextRequest) {
           db.settleCase(safeCaseId, db.getPromiseByCaseId(safeCaseId)?.amount || recCase.amount, 'PROMISE_TO_PAY_SETTLED_VERIFIED');
         }
         db.updatePromiseStatus(safeCaseId, 'KEPT');
+        await db.flushDurableState();
 
         return NextResponse.json({
           success: true,
@@ -134,6 +138,7 @@ export async function POST(req: NextRequest) {
             details: `Customer breached payment promise. Case escalated to Commercial Collections Specialist.`
           });
         }
+        await db.flushDurableState();
         return NextResponse.json({
           success: true,
           message: `Promise for case ${safeCaseId} marked as BROKEN and escalated`,
@@ -154,6 +159,7 @@ export async function POST(req: NextRequest) {
           result: 'ACTION_EXECUTED',
           details: `Autonomous reminder dispatched to ${recCase.customer_email} for committed ₹${recCase.amount.toLocaleString('en-IN')}.`,
         });
+        await db.flushDurableState();
         return NextResponse.json({
           success: true,
           message: `Reminder sent for case ${caseId}`,
@@ -178,6 +184,7 @@ export async function POST(req: NextRequest) {
           result: 'ACTION_EXECUTED',
           details: `Promise-to-pay schedule extended with customer agreement for case ${caseId}.`,
         });
+        await db.flushDurableState();
         return NextResponse.json({
           success: true,
           message: `Promise for case ${safeCaseId} rescheduled`,

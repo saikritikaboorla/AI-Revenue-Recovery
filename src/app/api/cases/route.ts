@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  await db.ensureDurableState();
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status') || undefined;
   const playbook = searchParams.get('playbook') || undefined;
@@ -17,6 +18,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE() {
+  await db.ensureDurableState();
   db.resetToSeed();
+  await db.flushDurableState(true);
   return NextResponse.json({ success: true, message: 'Database reset to verified seed CSV state' });
 }

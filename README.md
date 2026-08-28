@@ -3,14 +3,14 @@
 **Find revenue that is slipping away and win it back.**
 
 RecoverAI is an AI-assisted revenue-recovery platform. It detects seeded or
-simulated revenue-risk cases, uses a real Claude LLM call to diagnose the
+simulated revenue-risk cases, uses a real Google Gemini LLM call to diagnose the
 failure and recommend a recovery playbook, validates the recommendation
 against a fixed playbook set, runs deterministic guardrail checks, executes
 a bounded recovery action, and records verified recovery in a canonical ledger
 with a full audit trail.
 
 > **Architecture disclosure:** Case diagnosis and playbook recommendation use a
-> real server-side call to the Claude API (Anthropic). Guardrail evaluation,
+> real server-side call to the Gemini API (Google). Guardrail evaluation,
 > execution authorization, settlement verification, and ledger writes are
 > fully deterministic and cannot be influenced by the model. If the model
 > call fails or returns invalid output the system falls back to the
@@ -22,7 +22,7 @@ with a full audit trail.
 ```
 CASE DATA
    ↓
-AI DIAGNOSIS + PLAYBOOK RECOMMENDATION   ← Claude API (server-side only)
+AI DIAGNOSIS + PLAYBOOK RECOMMENDATION   ← Gemini API (server-side only)
    ↓
 FIXED PLAYBOOK VALIDATION                ← model output validated against 7 known types
    ↓
@@ -75,9 +75,9 @@ validates the recommendation and enforces guardrails.
 
 ### Provider and model
 
-- **Provider:** Anthropic
-- **Model:** `claude-3-5-haiku-20241022`
-- **Call location:** `src/lib/ai-claude.ts` — `getAIDecision()` function
+- **Provider:** Google Gemini
+- **Model:** `gemini-3.6-flash`
+- **Call location:** `src/lib/ai-gemini.ts` — `getAIDecision()` function
 
 ### What the model receives
 
@@ -92,7 +92,7 @@ Each case request sends:
 - Current guardrail policy (for context only — model cannot modify it)
 
 No personally identifiable information beyond what is already in the case
-record is sent. The API key is read from `ANTHROPIC_API_KEY` server-side and
+record is sent. The API key is read from `GEMINI_API_KEY` server-side and
 is never exposed to the client.
 
 ### What the model returns
@@ -144,7 +144,7 @@ Every Case Trace shows an "AI Decision Evidence" panel with:
 - Model reasoning
 - Key case signals that influenced the recommendation
 - Timestamp of the model call
-- Collapsed raw model response (actual JSON from Claude, not fabricated)
+- Collapsed raw model response (actual JSON from Gemini, not fabricated)
 - AI vs Guardrails boundary disclosure
 
 ## Recovery loop
@@ -163,11 +163,12 @@ corresponding verification audit event.
 - **Framework:** Next.js 16 App Router, React 19, TypeScript 5.
 - **Styling and UI:** Tailwind CSS v4, dark visual theme, Framer Motion,
   GSAP, Three.js/OGL landing-page effects, Lucide icons, and Recharts.
-- **Server state:** `DatabaseService`, an in-memory server-side singleton seeded
-  from `data/seed/*.csv`.
-- **AI layer:** `src/lib/ai-claude.ts` — server-side only Claude API call via
-  `@anthropic-ai/sdk`. Falls back to `src/lib/ai-decision.ts` on any failure.
-- **Decisioning:** `src/lib/ai-claude.ts` (AI) → `src/lib/ai-decision.ts`
+- **Server state:** `DatabaseService`, the single case/ledger/audit repository.
+  It uses local runtime JSON in development and one private Vercel Blob JSON
+  document in production so simulator cases survive serverless instances.
+- **AI layer:** `src/lib/ai-gemini.ts` — server-side only Gemini API call via
+  `@google/genai`. Falls back to `src/lib/ai-decision.ts` on any failure.
+- **Decisioning:** `src/lib/ai-gemini.ts` (AI) → `src/lib/ai-decision.ts`
   (deterministic fallback) → `src/lib/playbooks/engine.ts` (guardrails +
   execution). The AI layer is the diagnosis layer only.
 - **Payments:** `RazorpayService`; mock mode is used when credentials are not
@@ -184,7 +185,7 @@ npm install
 npm run dev
 ```
 
-Set `ANTHROPIC_API_KEY` in `.env.local` for live AI diagnosis. Without it the
+Set `GEMINI_API_KEY` in `.env.local` for live AI diagnosis. Without it the
 system runs with the deterministic fallback and clearly labels decisions as
 such. Open <http://localhost:3000>.
 
@@ -219,7 +220,8 @@ npm run start
 
 | Variable | Required | Meaning |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Yes (for live AI) | Server-side Anthropic API key for Claude diagnosis. Never use `NEXT_PUBLIC_`. Falls back to deterministic engine if absent. |
+| `GEMINI_API_KEY` | Yes (for live AI) | Server-side Google Gemini API key for diagnosis/playbook recommendation. Never use `NEXT_PUBLIC_`. Falls back to deterministic engine if absent. |
+| `BLOB_READ_WRITE_TOKEN` | Production | Private Vercel Blob token used by the single `DatabaseService` repository for shared runtime state. Never expose client-side. |
 | `RAZORPAY_KEY_ID` | No | Enables Razorpay test-mode configuration when paired with the secret. |
 | `RAZORPAY_KEY_SECRET` | No | Razorpay test-mode secret; never expose it to client code. |
 | `NEXT_PUBLIC_APP_URL` | No | Public URL used for generated links. |
@@ -228,15 +230,19 @@ The repository ignores `.env*`. Never commit real credentials.
 
 ## Security
 
-- The Anthropic API key is read only from the server-side environment variable
-  `ANTHROPIC_API_KEY`. It is never exposed to client code or logged.
+- The Gemini API key is read only from the server-side environment variable
+  `GEMINI_API_KEY`. It is never exposed to client code or logged.
 - The model prompt contains case context but no raw API credentials.
-- Raw model responses shown in the Case Trace are sanitized display only.
+- Only the validated structured model response is shown in the collapsed Case
+  Trace section; provider errors are reduced to a generic fallback reason.
 - No `NEXT_PUBLIC_` AI key exists anywhere in the codebase.
+- No browser-side case store is used; production API requests hydrate and flush
+  the same private repository document.
 
 ## Known limitations
 
-- State is in memory and resets on restart or cold start.
+- Production state is shared through the private Vercel Blob runtime document;
+  the local JSON fallback is intended for development.
 - Seed data and Batch Simulator are the available detection sources; no live
   provider webhook route exists.
 - The default provider integration is a mock; demo recoveries are not real

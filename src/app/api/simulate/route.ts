@@ -1,11 +1,13 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { SimulationEngine } from '@/lib/simulation-engine';
+import { db } from '@/lib/db';
 import { errorMessage, isRecord, optionalFiniteNumber } from '@/lib/api-validation';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    await db.ensureDurableState();
     const body = await req.json().catch(() => ({}));
     if (!isRecord(body)) throw new Error('A JSON object is required');
     const requestedSize = optionalFiniteNumber(body.batchSize, 'batchSize') ?? 10;
@@ -14,6 +16,7 @@ export async function POST(req: NextRequest) {
     }
     const batchSize = requestedSize;
     const result = await SimulationEngine.runBatchSimulation({ batchSize });
+    await db.flushDurableState();
     return NextResponse.json(result);
   } catch (err: any) {
     return NextResponse.json({ error: errorMessage(err, 'Batch simulation failed') }, { status: 400 });
