@@ -25,7 +25,7 @@ export default function ErrorBoundary({
         <div>
           <h2 className="text-xl font-bold text-[#F5F7FA]">Command Center Recovery Active</h2>
           <p className="text-xs text-[#98A2B3] mt-1.5">
-            A temporary component state exception occurred. The underlying FinTech database and agent engine remain healthy.
+            A temporary component state exception occurred. The underlying FinTech database and recovery engine remain healthy.
           </p>
         </div>
 

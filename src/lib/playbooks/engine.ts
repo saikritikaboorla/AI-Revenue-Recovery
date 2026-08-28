@@ -221,7 +221,9 @@ export class RecoveryPipeline {
 
       // 100% Guaranteed Write to Recovery Ledger
       const ledgerEntry: RecoveryLedgerRecord = {
-        id: `ledg_${Date.now().toString().slice(-6)}`,
+      // Scope the ledger key to the case so fast batch executions cannot
+      // overwrite one another when they happen in the same millisecond.
+      id: `ledg_${recCase.id}_${Date.now().toString().slice(-6)}`,
         case_id: recCase.id,
         customer_id: recCase.customer_id,
         amount_at_risk: recCase.amount,

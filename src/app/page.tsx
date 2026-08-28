@@ -87,7 +87,7 @@ const PLAYBOOKS = [
     num: '06',
     icon: MessageSquare,
     accent: 'pink',
-    title: 'Hinglish Recovery AI',
+    title: 'Hinglish Recovery',
     desc: 'Bilingual conversational WhatsApp outreach crafted for Indian D2C and retail segments to maximise open rates.',
   },
   {
@@ -238,7 +238,7 @@ export default function LandingPage() {
           <h1 className="mx-auto max-w-5xl text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-[-0.035em] text-white leading-[1.06] mb-9 sm:mb-11">
             REVENUE IS SLIPPING. <br className="hidden sm:block" />
             <span className="bg-gradient-to-r from-blue-400 via-teal-300 to-indigo-400 bg-clip-text text-transparent">
-              THE AGENT FINDS IT.
+              THE ENGINE FINDS IT.
             </span>
           </h1>
 
@@ -290,9 +290,9 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 relative">
               {[
                 { step: '01', title: 'Revenue At Risk', desc: 'Webhook catches dropoffs & bank declines', color: 'border-amber-500/30 bg-amber-500/5 text-amber-400' },
-                { step: '02', title: 'AI Detection', desc: 'Analyzes root failure code & risk factor', color: 'border-blue-500/30 bg-blue-500/5 text-blue-400' },
+                { step: '02', title: 'Automated Detection', desc: 'Classifies root failure code & risk factor', color: 'border-blue-500/30 bg-blue-500/5 text-blue-400' },
                 { step: '03', title: 'Recovery Decision', desc: 'Selects optimal bounded playbook & rails', color: 'border-purple-500/30 bg-purple-500/5 text-purple-400' },
-                { step: '04', title: 'Recovery Action', desc: 'Dispatches gateway failover or AI prompt', color: 'border-cyan-500/30 bg-cyan-500/5 text-cyan-400' },
+                { step: '04', title: 'Recovery Action', desc: 'Dispatches a bounded gateway or customer outreach action', color: 'border-cyan-500/30 bg-cyan-500/5 text-cyan-400' },
                 { step: '05', title: 'Verified Revenue', desc: 'Verified settlement written to ledger', color: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-400' },
               ].map((node, idx) => (
                 <div
@@ -410,7 +410,7 @@ export default function LandingPage() {
               </h2>
               <p className="text-base text-[#6B7FA3] leading-relaxed">
                 Each playbook maps a distinct revenue-loss pattern to a bounded, auditable
-                intervention — from sub-second gateway failover to bilingual AI outreach.
+                intervention — from gateway failover to bilingual outreach.
               </p>
             </div>
 

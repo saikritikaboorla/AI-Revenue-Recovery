@@ -86,7 +86,7 @@ const RULE_CARDS: RuleCardConfig[] = [
     key: 'maxRiskScoreForAutonomousAction',
     label: 'Max Risk Score for Autonomous Action',
     description:
-      'Customers whose AI-computed risk score exceeds this threshold are routed to human review rather than autonomous action. Reduces bad-debt risk on high-risk accounts.',
+      'Customers whose calculated risk score exceeds this threshold are routed to human review rather than autonomous action. Reduces bad-debt risk on high-risk accounts.',
     type: 'number',
     icon: <Brain className="h-4 w-4" />,
     unit: '/ 100',
@@ -108,9 +108,9 @@ const RULE_CARDS: RuleCardConfig[] = [
   },
   {
     key: 'enableVoiceAiForEnterpriseOnly',
-    label: 'Enable Voice AI for Enterprise Only',
+    label: 'Enable Assisted Voice for Enterprise Only',
     description:
-      'When enabled, AI Voice IVR calls are restricted to ENTERPRISE and HIGH_LTV_VIP customer segments only. Reduces cost-per-intervention on lower-value segments while maximizing premium recovery.',
+      'When enabled, assisted Voice IVR calls are restricted to ENTERPRISE and HIGH_LTV_VIP customer segments only. Reduces cost-per-intervention on lower-value segments while maximizing premium recovery.',
     type: 'toggle',
     icon: <PhoneCall className="h-4 w-4" />,
   },

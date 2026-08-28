@@ -665,7 +665,7 @@ export function generateSeedCases(): RecoveryCase[] {
           id: 'int_107',
           caseId: 'REC-9026',
           type: 'AI_VOICE_IVR_AUTHORIZATION',
-          channel: 'AI Voice Bridge / Telephony Gateway',
+          channel: 'Assisted Voice Bridge / Telephony Gateway',
           initiatedAt: new Date(now.getTime() - 5 * 60 * 1000).toISOString(),
           status: 'PENDING',
           details: { voiceSessionId: 'call_9918a', agentModel: 'RecoverAI Enterprise Voice' },

@@ -53,7 +53,7 @@ export class RecoveryAgentEngine {
             if (customer.segment === 'HIGH_LTV_VIP' || customer.segment === 'ENTERPRISE') {
               selectedIntervention = 'AI_VOICE_IVR_AUTHORIZATION';
               diagnosis = 'High-value cardholder OTP latency. Customer actively engaged in checkout session.';
-              rationale = 'Initiated real-time AI Voice Bridge to supply instant 1-tap card re-authorization token.';
+              rationale = 'Initiated real-time assisted Voice Bridge to supply instant 1-tap card re-authorization token.';
               recoveryConfidence = 90;
               lossProbability = 0.70;
             } else {

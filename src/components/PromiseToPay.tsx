@@ -22,6 +22,7 @@ export const PromiseToPay: React.FC<PromiseToPayProps> = ({ onSelectCase }) => {
   const [promises, setPromises] = useState<PromiseRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const fetchPromises = async () => {
@@ -34,7 +35,7 @@ export const PromiseToPay: React.FC<PromiseToPayProps> = ({ onSelectCase }) => {
       setPromises(data.promises || []);
     } catch (err) {
       console.error('Failed to load promises:', err);
-      setError('Unable to load promise-to-pay records. Retrying...');
+      setError('Unable to load promise-to-pay records. Use Refresh to retry.');
     } finally {
       setLoading(false);
     }
@@ -46,17 +47,21 @@ export const PromiseToPay: React.FC<PromiseToPayProps> = ({ onSelectCase }) => {
 
   const handleAction = async (caseId: string, action: string) => {
     setActionLoading(caseId + action);
+    setActionError(null);
     try {
       const res = await fetch('/api/promises', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ caseId, action })
       });
-      if (res.ok) {
-        await fetchPromises();
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
       }
+      await fetchPromises();
     } catch (err) {
       console.error('Promise action error:', err);
+      setActionError(err instanceof Error ? err.message : 'Unable to update promise-to-pay record.');
     } finally {
       setActionLoading(null);
     }
@@ -171,6 +176,8 @@ export const PromiseToPay: React.FC<PromiseToPayProps> = ({ onSelectCase }) => {
           <p className="text-xs text-rose-400/70 mt-0.5">Auto-escalated to collections</p>
         </div>
       </div>
+
+      {actionError && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/20 px-3 py-2 text-xs text-rose-300">{actionError}</div>}
 
       {/* Content */}
       {loading ? (

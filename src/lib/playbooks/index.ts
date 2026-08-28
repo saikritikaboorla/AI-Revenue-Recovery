@@ -78,7 +78,7 @@ export const PLAYBOOK_CONFIGS: Record<PlaybookType, PlaybookConfig> = {
   },
   HINGLISH_RECOVERY: {
     type: 'HINGLISH_RECOVERY',
-    displayName: 'Hinglish Conversational AI Assist',
+    displayName: 'Hinglish Conversational Assist',
     description: 'Natural bilingual WhatsApp and SMS conversational outreach designed for high-conversion Indian D2C & Retail consumers.',
     triggerEvent: 'payment.dropped_upi_intent',
     allowedActions: ['send_hinglish_whatsapp_prompt', 'dispatch_assisted_ivr_call', 'send_upi_intent_qr'],
