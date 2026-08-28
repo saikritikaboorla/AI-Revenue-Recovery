@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import CountUp from '@/components/CountUp';
 import {
   BarChart,
   Bar,
@@ -42,9 +43,10 @@ function SkeletonChart({ height = 240 }: { height?: number }) {
 }
 
 function SummaryCard({
-  label, value, sub, valueColor, Icon, iconCls,
+  label, value, sub, valueColor, Icon, iconCls, prefix, suffix,
 }: {
-  label: string; value: string; sub: string;
+  label: string; value: number; sub: string;
+  prefix?: string; suffix?: string;
   valueColor: string; Icon: any; iconCls: string;
 }) {
   return (
@@ -53,7 +55,9 @@ function SummaryCard({
         <span className="text-[10px] uppercase font-semibold tracking-wider text-[#98A2B3]">{label}</span>
         <Icon className={`h-4 w-4 ${iconCls}`} />
       </div>
-      <p className={`text-2xl font-extrabold ${valueColor}`}>{value}</p>
+      <p className={`text-2xl font-extrabold ${valueColor}`}>
+        {prefix}<CountUp to={value} duration={1} separator="," />{suffix}
+      </p>
       <p className="text-[10px] text-[#98A2B3]">{sub}</p>
     </div>
   );
@@ -183,7 +187,8 @@ export const RecoveryCharts: React.FC<RecoveryChartsProps> = ({ metrics, loading
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <SummaryCard
           label="Revenue at Risk"
-          value={`₹${atRisk.toLocaleString('en-IN')}`}
+          value={atRisk}
+          prefix="₹"
           sub="Across all active cases"
           valueColor="text-amber-400"
           Icon={AlertTriangle}
@@ -191,7 +196,8 @@ export const RecoveryCharts: React.FC<RecoveryChartsProps> = ({ metrics, loading
         />
         <SummaryCard
           label="Verified Recovered"
-          value={`₹${recovered.toLocaleString('en-IN')}`}
+          value={recovered}
+          prefix="₹"
           sub={`${ledger} ledger entries`}
           valueColor="text-emerald-400"
           Icon={CheckCircle2}
@@ -199,7 +205,8 @@ export const RecoveryCharts: React.FC<RecoveryChartsProps> = ({ metrics, loading
         />
         <SummaryCard
           label="Recovery Win Rate"
-          value={`${rate.toFixed(1)}%`}
+          value={rate}
+          suffix="%"
           sub="Webhook-verified only"
           valueColor="text-blue-400"
           Icon={TrendingUp}
@@ -207,7 +214,7 @@ export const RecoveryCharts: React.FC<RecoveryChartsProps> = ({ metrics, loading
         />
         <SummaryCard
           label="Total Cases"
-          value={total.toLocaleString()}
+          value={total}
           sub={`${escalated} escalated`}
           valueColor="text-cyan-400"
           Icon={Activity}

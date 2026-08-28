@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import CountUp from '@/components/CountUp';
 import {
   AlertTriangle,
   Banknote,
@@ -69,7 +70,8 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
     {
       id: 'at-risk',
       title: 'Revenue at Risk',
-      value: `₹${totalRevenueAtRisk.toLocaleString('en-IN')}`,
+      value: totalRevenueAtRisk,
+      prefix: '₹',
       subtitle: 'Detected across all cases',
       icon: AlertTriangle,
       valueColor: 'text-amber-400',
@@ -82,7 +84,8 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
     {
       id: 'recoverable',
       title: 'Recoverable Revenue',
-      value: `₹${totalRecoverableRevenue.toLocaleString('en-IN')}`,
+      value: totalRecoverableRevenue,
+      prefix: '₹',
       subtitle: 'Actionable via playbooks',
       icon: Banknote,
       valueColor: 'text-teal-400',
@@ -95,7 +98,8 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
     {
       id: 'recovered',
       title: 'Verified Recovered',
-      value: `₹${totalRevenueRecovered.toLocaleString('en-IN')}`,
+      value: totalRevenueRecovered,
+      prefix: '₹',
       subtitle: 'Webhook-confirmed settlements',
       icon: CheckCircle2,
       valueColor: 'text-emerald-400',
@@ -108,7 +112,8 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
     {
       id: 'win-rate',
       title: 'Recovery Win Rate',
-      value: `${overallRecoveryRate.toFixed(1)}%`,
+      value: overallRecoveryRate,
+      suffix: '%',
       subtitle: 'Across 7 active playbooks',
       icon: TrendingUp,
       valueColor: 'text-blue-400',
@@ -121,7 +126,7 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
     {
       id: 'active-cases',
       title: 'Active Cases',
-      value: totalCasesCount.toLocaleString('en-IN'),
+      value: totalCasesCount,
       subtitle: 'In agent processing pipeline',
       icon: Activity,
       valueColor: 'text-cyan-400',
@@ -134,7 +139,7 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
     {
       id: 'escalations',
       title: 'Escalations',
-      value: escalatedCasesCount.toLocaleString('en-IN'),
+      value: escalatedCasesCount,
       subtitle: 'Pending human review',
       icon: ShieldAlert,
       valueColor: 'text-purple-300',
@@ -147,7 +152,7 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
     {
       id: 'ledger',
       title: 'Ledger Entries',
-      value: ledgerEntriesCount.toLocaleString('en-IN'),
+      value: ledgerEntriesCount,
       subtitle: 'Immutable audit records',
       icon: BookOpen,
       valueColor: 'text-indigo-400',
@@ -201,7 +206,9 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
                   ${card.valueColor}
                 `}
               >
-                {card.value}
+                {card.prefix}
+                <CountUp to={card.value} duration={1} separator="," />
+                {card.suffix}
               </div>
               <div className="mt-1.5 text-xs text-[#98A2B3] truncate">
                 {card.subtitle}
