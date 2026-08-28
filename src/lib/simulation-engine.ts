@@ -52,6 +52,7 @@ interface ScenarioTemplate {
   failureReasonDisplay: string;
   amountRange: [number, number];
   baseRiskScore: [number, number];
+  failureReasons?: Array<{ code: string; display: string }>;
 }
 
 const SCENARIO_TEMPLATES: ScenarioTemplate[] = [
@@ -96,6 +97,11 @@ const SCENARIO_TEMPLATES: ScenarioTemplate[] = [
     failureReasonDisplay: '3D Secure 2.0 OTP authorization timeout on mobile UPI intent flow',
     amountRange: [499, 12000],
     baseRiskScore: [5, 45],
+    failureReasons: [
+      { code: 'AUTH_FAILED_OTP_TIMEOUT', display: '3D Secure 2.0 OTP authorization timeout on mobile UPI intent flow' },
+      { code: 'CUSTOMER_DROPOFF_AT_PAYMENT_PAGE', display: 'Customer dropped off at payment page before authorization' },
+      { code: 'INSUFFICIENT_FUNDS', display: 'Debit failed because of low balance at the settlement moment' },
+    ],
   },
   {
     playbook: 'PROMISE_TO_PAY',
@@ -142,6 +148,10 @@ function generateCase(template?: ScenarioTemplate): RecoveryCaseRecord {
   const amount = randInt(tpl.amountRange[0], tpl.amountRange[1]);
   const riskScore = randInt(tpl.baseRiskScore[0], tpl.baseRiskScore[1]);
   const now = new Date().toISOString();
+  const failureVariant = tpl.failureReasons?.[Math.abs((amount + riskScore) % tpl.failureReasons.length)] ?? {
+    code: tpl.failureReason,
+    display: tpl.failureReasonDisplay,
+  };
 
   // Generate a unique case ID
   const caseId = `SIM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
@@ -156,7 +166,7 @@ function generateCase(template?: ScenarioTemplate): RecoveryCaseRecord {
     amount,
     currency: 'INR',
     playbook: tpl.playbook,
-    failure_reason: tpl.failureReason,
+    failure_reason: failureVariant.code,
     status: 'DETECTED',
     current_step: 'DETECTED',
     recovery_confidence: Math.max(40, 100 - riskScore),
@@ -164,7 +174,7 @@ function generateCase(template?: ScenarioTemplate): RecoveryCaseRecord {
     retry_count: 0,
     max_retries: PLAYBOOK_CONFIGS[tpl.playbook].maxRetries,
     requires_human_approval: false,
-    diagnosis_summary: `Auto-generated simulation case. Root cause: ${tpl.failureReasonDisplay}. Risk score: ${riskScore}/100.`,
+    diagnosis_summary: `Auto-generated simulation case. Root cause: ${failureVariant.display}. Risk score: ${riskScore}/100.`,
     rationale: `Playbook [${PLAYBOOK_CONFIGS[tpl.playbook].displayName}] selected by simulation engine.`,
     created_at: now,
     updated_at: now,
@@ -180,8 +190,8 @@ function generateCase(template?: ScenarioTemplate): RecoveryCaseRecord {
     stage: 'DETECT',
     actor: 'RECOVER_AI_ENGINE',
     action: 'REVENUE_AT_RISK_DETECTED',
-    result: 'SUCCESS',
-    details: `Detected revenue at risk: ₹${amount.toLocaleString('en-IN')} for ${customer.name} (${customer.segment}). Failure: ${tpl.failureReason}`,
+    result: 'DETECTED',
+    details: `Detected revenue at risk: ₹${amount.toLocaleString('en-IN')} for ${customer.name} (${customer.segment}). Failure: ${failureVariant.code}`,
   });
 
   return record;
@@ -250,10 +260,10 @@ export class SimulationEngine {
           recoveredCount      += 1;
         } else if (res.escalated) {
           escalatedCount += 1;
-        } else {
+        } else if (res.case.status === 'STOPPED_UNRECOVERABLE') {
           failedCount += 1;
         }
-        if (res.stopped) stoppedCount += 1;
+        if (res.stopped && !res.recovered && !res.escalated) stoppedCount += 1;
         const decision = res.case.ai_decision;
         if (decision) {
           decisionDistribution[decision.selectedPlaybook] = (decisionDistribution[decision.selectedPlaybook] || 0) + 1;
@@ -274,7 +284,6 @@ export class SimulationEngine {
           predictedRecoverable: Math.round(recCase.amount * recCase.recovery_confidence / 100),
         });
       } else {
-        failedCount += 1;
         caseResults.push({
           id:           recCase.id,
           customerName: recCase.customer_name,

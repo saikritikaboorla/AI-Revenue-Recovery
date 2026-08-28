@@ -12,6 +12,8 @@ const DEFAULT_GUARDRAILS: GuardrailPolicy = {
   enableAssistedVoiceForEnterpriseOnly: false,
 };
 
+const RUNTIME_STATE_FILE = path.join(process.cwd(), '.cache', 'recoverai-runtime-state.json');
+
 export interface CustomerRecord {
   id: string;
   name: string;
@@ -75,7 +77,7 @@ export interface AuditRecord {
   stage: 'DETECT' | 'DIAGNOSE' | 'DECIDE_PLAYBOOK' | 'CHECK_GUARDRAILS' | 'EXECUTE_ACTION' | 'VERIFY' | 'STOP_OR_ESCALATE';
   actor: string;
   action: string;
-  result: 'SUCCESS' | 'FAILED' | 'ESCALATED' | 'BLOCKED' | 'NOT_RECOVERED';
+  result: 'SUCCESS' | 'FAILED' | 'ESCALATED' | 'BLOCKED' | 'NOT_RECOVERED' | 'DETECTED' | 'DIAGNOSED' | 'DECIDED' | 'GUARDRAIL_PASSED' | 'ACTION_EXECUTED' | 'SETTLEMENT_VERIFIED' | 'RECOVERED' | 'STOPPED';
   details: string;
   metadata?: Record<string, unknown>;
 }
@@ -99,7 +101,7 @@ export interface PromiseRecord {
   customer_name: string;
   amount: number;
   promise_date: string;
-  status: 'PROMISED' | 'UPCOMING' | 'DUE' | 'KEPT' | 'BROKEN' | 'ESCALATED';
+  status: 'PROMISED' | 'RESCHEDULED' | 'UPCOMING' | 'DUE' | 'KEPT' | 'BROKEN' | 'ESCALATED';
   channel: string;
   created_at: string;
 }
@@ -125,7 +127,9 @@ export class DatabaseService {
   private isLoaded: boolean = false;
 
   private constructor() {
-    this.seedFromCSV();
+    if (!this.loadRuntimeState()) {
+      this.seedFromCSV();
+    }
   }
 
   public static getInstance(): DatabaseService {
@@ -133,6 +137,58 @@ export class DatabaseService {
       DatabaseService.instance = new DatabaseService();
     }
     return DatabaseService.instance;
+  }
+
+  private persistRuntimeState(): void {
+    try {
+      const dir = path.dirname(RUNTIME_STATE_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(RUNTIME_STATE_FILE, JSON.stringify({
+        guardrails: this.guardrails,
+        customers: Array.from(this.customers.values()),
+        cases: Array.from(this.cases.values()),
+        ledger: Array.from(this.ledger.values()),
+        audits: this.audits,
+        escalations: Array.from(this.escalations.values()),
+        promises: Array.from(this.promises.values()),
+      }));
+    } catch (err) {
+      console.warn('Runtime state persistence notice:', err);
+    }
+  }
+
+  private loadRuntimeState(): boolean {
+    try {
+      if (!fs.existsSync(RUNTIME_STATE_FILE)) return false;
+      const raw = fs.readFileSync(RUNTIME_STATE_FILE, 'utf8');
+      if (!raw.trim()) return false;
+      const parsed = JSON.parse(raw) as Partial<{
+        guardrails: GuardrailPolicy;
+        customers: CustomerRecord[];
+        cases: RecoveryCaseRecord[];
+        ledger: RecoveryLedgerRecord[];
+        audits: AuditRecord[];
+        escalations: EscalationRecord[];
+        promises: PromiseRecord[];
+      }>;
+      if (parsed.guardrails) this.guardrails = parsed.guardrails;
+      this.customers = new Map((parsed.customers || []).map(item => [item.id, item]));
+      this.cases = new Map((parsed.cases || []).map(item => [item.id, item]));
+      this.ledger = new Map((parsed.ledger || []).map(item => [item.id, item]));
+      this.audits = parsed.audits || [];
+      this.escalations = new Map((parsed.escalations || []).map(item => [item.id, item]));
+      this.promises = new Map((parsed.promises || []).map(item => [item.id, item]));
+      this.ensureRecoveredSettlements();
+      return true;
+    } catch (err) {
+      console.warn('Runtime state load notice:', err);
+      try {
+        if (fs.existsSync(RUNTIME_STATE_FILE)) fs.unlinkSync(RUNTIME_STATE_FILE);
+      } catch {
+        // Ignore cleanup failures; seed loading can still proceed.
+      }
+      return false;
+    }
   }
 
   public seedFromCSV(): void {
@@ -316,6 +372,7 @@ export class DatabaseService {
       // for verified revenue. Reconcile legacy/demo rows once at load time so
       // a recovered case can never exist without its settlement proof.
       this.ensureRecoveredSettlements();
+      this.persistRuntimeState();
 
       this.isLoaded = true;
     } catch (err) {
@@ -335,17 +392,22 @@ export class DatabaseService {
       && /error|exception|system failure|execution failure/i.test(`${row.action} ${row.details}`);
     if (row.stage === 'VERIFY') {
       if (isExplicitFailure) return 'FAILED';
-      return hasSettlement ? 'SUCCESS' : 'NOT_RECOVERED';
+      return hasSettlement ? 'SETTLEMENT_VERIFIED' : 'NOT_RECOVERED';
     }
     if (row.stage === 'STOP_OR_ESCALATE') {
       if (recCase.status === 'ESCALATED') return 'ESCALATED';
-      if (recCase.status === 'RECOVERED') return 'SUCCESS';
-      if (recCase.status.startsWith('STOPPED')) return 'BLOCKED';
+      if (recCase.status === 'RECOVERED') return 'RECOVERED';
+      if (recCase.status.startsWith('STOPPED')) return 'STOPPED';
       if (isExplicitFailure) return 'FAILED';
-      return 'BLOCKED';
+      return 'STOPPED';
     }
 
     // Preserve FAILED only when the source explicitly describes an error.
+    if (row.stage === 'DETECT') return 'DETECTED';
+    if (row.stage === 'DIAGNOSE') return 'DIAGNOSED';
+    if (row.stage === 'DECIDE_PLAYBOOK') return 'DECIDED';
+    if (row.stage === 'CHECK_GUARDRAILS') return row.result === 'FAILED' ? (isExplicitFailure ? 'FAILED' : 'BLOCKED') : 'GUARDRAIL_PASSED';
+    if (row.stage === 'EXECUTE_ACTION') return 'ACTION_EXECUTED';
     return row.result === 'FAILED' ? (isExplicitFailure ? 'FAILED' : 'BLOCKED') : row.result as AuditRecord['result'];
   }
 
@@ -458,6 +520,10 @@ export class DatabaseService {
       atRisk: stat.atRisk,
       recovered: stat.recovered,
       caseCount: stat.count,
+      recoveredCount: stat.recoveredCount,
+      escalatedCount: allCases.filter(c => c.playbook === pb && c.status === 'ESCALATED').length,
+      stoppedCount: allCases.filter(c => c.playbook === pb && c.status.startsWith('STOPPED')).length,
+      promiseToPayCount: Array.from(this.promises.values()).filter(p => allCases.some(c => c.id === p.case_id && c.playbook === pb)).length,
       recoveryRate: stat.atRisk > 0 ? Number(((stat.recovered / stat.atRisk) * 100).toFixed(1)) : 0
     }));
 
@@ -563,10 +629,12 @@ export class DatabaseService {
   public saveCase(c: RecoveryCaseRecord): void {
     c.updated_at = new Date().toISOString();
     this.cases.set(c.id, c);
+    this.persistRuntimeState();
   }
 
   public addAudit(audit: AuditRecord): void {
     this.audits.push(audit);
+    this.persistRuntimeState();
   }
 
   public addLedger(record: RecoveryLedgerRecord): void {
@@ -578,6 +646,7 @@ export class DatabaseService {
     );
     if (existing) return;
     this.ledger.set(record.id, record);
+    this.persistRuntimeState();
   }
 
   /** Establish the one canonical recovered-case state: case, proof, ledger, audit. */
@@ -624,7 +693,7 @@ export class DatabaseService {
     }
 
     const hasVerificationAudit = this.getRawAuditsByCaseId(caseId).some(a =>
-      a.stage === 'VERIFY' && a.result === 'SUCCESS'
+      a.stage === 'VERIFY' && (a.result === 'SUCCESS' || a.result === 'SETTLEMENT_VERIFIED')
     );
     if (!hasVerificationAudit) {
       this.addAudit({
@@ -634,10 +703,11 @@ export class DatabaseService {
         stage: 'VERIFY',
         actor: verificationSource.includes('PROMISE') ? 'PROMISE_TO_PAY_HANDLER' : 'RAZORPAY_WEBHOOK_HANDLER',
         action: 'SETTLEMENT_VERIFIED_AND_LEDGER_WRITTEN',
-        result: 'SUCCESS',
+        result: 'SETTLEMENT_VERIFIED',
         details: `₹${ledgerEntry.recovered_amount.toLocaleString('en-IN')} verified and recorded in ledger (${ledgerEntry.id}).`,
       });
     }
+    this.persistRuntimeState();
     return ledgerEntry;
   }
 
@@ -656,10 +726,12 @@ export class DatabaseService {
 
   public addEscalation(esc: EscalationRecord): void {
     this.escalations.set(esc.id, esc);
+    this.persistRuntimeState();
   }
 
   public addPromise(promise: PromiseRecord): void {
     this.promises.set(promise.id, promise);
+    this.persistRuntimeState();
   }
 
   public getPromiseByCaseId(caseId: string): PromiseRecord | undefined {
@@ -676,6 +748,7 @@ export class DatabaseService {
         this.promises.set(id, prom);
       }
     }
+    this.persistRuntimeState();
   }
 
   public getCustomerById(id: string): CustomerRecord | undefined {
@@ -699,6 +772,7 @@ export class DatabaseService {
         this.escalations.set(id, esc);
       }
     }
+    this.persistRuntimeState();
   }
 
   public resetToSeed(): void {
@@ -710,6 +784,11 @@ export class DatabaseService {
     this.promises.clear();
     this.guardrails = { ...DEFAULT_GUARDRAILS };
     this.seedFromCSV();
+    try {
+      if (fs.existsSync(RUNTIME_STATE_FILE)) fs.unlinkSync(RUNTIME_STATE_FILE);
+    } catch (err) {
+      console.warn('Runtime state reset notice:', err);
+    }
   }
 }
 

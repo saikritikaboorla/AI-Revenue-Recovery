@@ -242,7 +242,7 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
             </h3>
           </div>
           <p className="text-xs text-[#98A2B3] mt-1">
-            Simulate realistic revenue-loss vectors at scale to evaluate autonomous agent recovery rate, guardrails, and latency.
+            Simulate realistic revenue-loss vectors at scale to evaluate recovery rate, guardrails, and measured runtime.
           </p>
         </div>
 

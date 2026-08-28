@@ -42,6 +42,14 @@ const RESULT_CONFIG: Record<string, { cls: string; icon: React.ReactNode }> = {
   NOT_RECOVERED: { cls: 'text-slate-300 bg-slate-500/10 border-slate-500/30',   icon: <Clock className="h-3 w-3" /> },
   FAILED:    { cls: 'text-rose-400 bg-rose-500/10 border-rose-500/30',          icon: <XCircle className="h-3 w-3" /> },
   BLOCKED:   { cls: 'text-orange-400 bg-orange-500/10 border-orange-500/30',    icon: <XCircle className="h-3 w-3" /> },
+  DETECTED:  { cls: 'text-cyan-300 bg-cyan-500/10 border-cyan-500/30',          icon: <CheckCircle2 className="h-3 w-3" /> },
+  DIAGNOSED: { cls: 'text-cyan-300 bg-cyan-500/10 border-cyan-500/30',          icon: <CheckCircle2 className="h-3 w-3" /> },
+  DECIDED:   { cls: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/30',    icon: <CheckCircle2 className="h-3 w-3" /> },
+  GUARDRAIL_PASSED: { cls: 'text-blue-300 bg-blue-500/10 border-blue-500/30',   icon: <CheckCircle2 className="h-3 w-3" /> },
+  ACTION_EXECUTED: { cls: 'text-purple-300 bg-purple-500/10 border-purple-500/30', icon: <CheckCircle2 className="h-3 w-3" /> },
+  SETTLEMENT_VERIFIED: { cls: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30', icon: <CheckCircle2 className="h-3 w-3" /> },
+  RECOVERED: { cls: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30', icon: <CheckCircle2 className="h-3 w-3" /> },
+  STOPPED: { cls: 'text-rose-300 bg-rose-500/10 border-rose-500/30', icon: <XCircle className="h-3 w-3" /> },
 };
 
 function timeAgo(ts: string): string {

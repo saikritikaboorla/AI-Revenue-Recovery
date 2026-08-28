@@ -23,6 +23,11 @@ export async function GET(
   const ledgerEntries = db.getLedgerEntriesByCaseId(id);
   const promise = db.getPromiseByCaseId(id);
   const hinglishTranscript = recCase.playbook === 'HINGLISH_RECOVERY' ? buildHinglishTranscript(recCase) : null;
+  if (hinglishTranscript) {
+    hinglishTranscript.ledgerEntryId = ledgerEntries[0]?.id;
+    hinglishTranscript.recoveredAmount = ledgerEntries[0]?.recovered_amount || 0;
+    hinglishTranscript.settlementVerified = ledgerEntries.length > 0;
+  }
   const aiDecision = recCase.ai_decision || createAIDecision(recCase, guardrails, db.getCustomerById(recCase.customer_id));
   if (!recCase.ai_decision) {
     recCase.ai_decision = aiDecision;
@@ -34,7 +39,7 @@ export async function GET(
       stage: 'DECIDE_PLAYBOOK',
       actor: 'RECOVERAI_DECISION_ENGINE',
       action: 'AUTOMATED_DECISION_REQUESTED',
-      result: aiDecision.escalationRequired ? 'ESCALATED' : 'SUCCESS',
+      result: aiDecision.escalationRequired ? 'ESCALATED' : 'DECIDED',
       details: `${aiDecision.detectedIssue}. ${aiDecision.expectedOutcome}`,
       metadata: { aiDecision },
     });
@@ -139,6 +144,10 @@ export async function GET(
           ? `Ledger entry ${ledgerEntries[0].id} written at ${ledgerEntries[0].verified_at}.`
           : 'No ledger entry recorded yet.',
       },
+      ...(hinglishTranscript ? [{
+        stage: 'SIMULATED_HINGLISH',
+        details: `SIMULATED VOICE/WHATSAPP RECOVERY — PREVIEW. Branch ${hinglishTranscript.branch}, action ${hinglishTranscript.selectedAction}, outcome ${hinglishTranscript.outcome}${hinglishTranscript.settlementVerified ? `, verified amount ₹${hinglishTranscript.recoveredAmount.toLocaleString('en-IN')}` : ''}${hinglishTranscript.ledgerEntryId ? `, ledger ${hinglishTranscript.ledgerEntryId}` : ''}.`,
+      }] : []),
     ],
   });
 }

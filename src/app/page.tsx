@@ -232,7 +232,7 @@ export default function LandingPage() {
           {/* Precision Badge */}
           <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-[11px] sm:text-xs font-semibold tracking-[0.12em] uppercase mb-12 sm:mb-16 shadow-[0_0_25px_rgba(59,130,246,0.18)] backdrop-blur-md">
             <Zap className="h-4 w-4 text-blue-400 shrink-0" />
-            AI-Governed Closed-Loop Revenue Recovery Engine
+            Deterministic Closed-Loop Revenue Recovery Engine
           </div>
 
           {/* Large Bold Hero Headline */}
@@ -279,7 +279,7 @@ export default function LandingPage() {
               <div className="flex items-center gap-2.5">
                 <div className="h-3 w-3 rounded-full bg-teal-400 shadow-[0_0_10px_#2DD4BF] animate-pulse" />
                 <span className="text-xs sm:text-sm font-mono uppercase tracking-widest text-[#94A3B8]">
-                  Closed-Loop Autonomous Architecture
+                  Closed-Loop Bounded Architecture
                 </span>
               </div>
               <span className="text-xs font-mono px-2.5 py-1 rounded-md bg-teal-950/60 border border-teal-500/30 text-teal-300">
@@ -291,7 +291,7 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 relative">
               {[
                 { step: '01', title: 'Revenue At Risk', desc: 'Webhook catches dropoffs & bank declines', color: 'border-amber-500/30 bg-amber-500/5 text-amber-400' },
-                { step: '02', title: 'Automated Detection', desc: 'Deterministic context analysis of root failure code & risk factor', color: 'border-blue-500/30 bg-blue-500/5 text-blue-400' },
+                { step: '02', title: 'Automated Detection', desc: 'Deterministic context analysis of the root failure code and risk factor', color: 'border-blue-500/30 bg-blue-500/5 text-blue-400' },
                 { step: '03', title: 'Recovery Decision', desc: 'Selects optimal bounded playbook & rails', color: 'border-purple-500/30 bg-purple-500/5 text-purple-400' },
                 { step: '04', title: 'Recovery Action', desc: 'Dispatches a bounded gateway or customer outreach action', color: 'border-cyan-500/30 bg-cyan-500/5 text-cyan-400' },
                 { step: '05', title: 'Verified Revenue', desc: 'Verified settlement written to ledger', color: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-400' },

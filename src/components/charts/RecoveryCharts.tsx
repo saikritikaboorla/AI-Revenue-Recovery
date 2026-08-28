@@ -75,7 +75,7 @@ function RecoveryAnalysisSection({ playbookData, atRisk, recovered, rate, escala
   ];
   const surfaces: Record<string, string> = { amber: 'border-amber-400/25 bg-amber-400/5 open:bg-amber-400/10', emerald: 'border-emerald-400/25 bg-emerald-400/5 open:bg-emerald-400/10', purple: 'border-purple-400/25 bg-purple-400/5 open:bg-purple-400/10', red: 'border-rose-400/25 bg-rose-400/5 open:bg-rose-400/10' };
   const accents: Record<string, string> = { amber: 'text-amber-300', emerald: 'text-emerald-300', purple: 'text-purple-300', red: 'text-rose-300' };
-  return <section className="rounded-2xl border border-purple-500/25 bg-gradient-to-br from-purple-500/5 via-[#141A24] to-blue-500/5 p-5 shadow-[0_20px_45px_rgba(0,0,0,.18)]"><div className="mb-4 flex items-start gap-3"><div className="rounded-xl border border-purple-400/30 bg-purple-400/10 p-2 text-purple-200"><BrainCircuit className="h-5 w-5" /></div><div><p className="text-[11px] font-mono uppercase tracking-[.18em] text-purple-200">Recovery Analysis · Live metrics</p><h3 className="mt-1 text-lg font-bold text-white">What the recovery data is telling the engine</h3><p className="mt-1 text-sm text-slate-400">Deterministic explainability summaries derived from current playbook, case, and ledger results.</p></div></div><div className="grid gap-3 md:grid-cols-2">{cards.map(card => <details key={card.title} className={`group rounded-xl border ${surfaces[card.color]}`}><summary className="flex cursor-pointer list-none items-center gap-3 p-4"><card.icon className={`h-5 w-5 shrink-0 ${accents[card.color]}`} /><span className="min-w-0 flex-1"><span className={`block text-[10px] font-bold uppercase tracking-wider ${accents[card.color]}`}>{card.label}</span><span className="mt-1 block text-sm font-semibold text-white">{card.title}</span></span><ChevronDown className="h-4 w-4 text-slate-500 transition-transform group-open:rotate-180" /></summary><div className="border-t border-white/10 px-4 pb-4 pt-3"><p className="text-sm font-semibold text-slate-200">{card.summary}</p><p className="mt-2 text-xs leading-relaxed text-slate-400">{card.body}</p></div></details>)}</div></section>;
+  return <section className="rounded-2xl border border-purple-500/25 bg-gradient-to-br from-purple-500/5 via-[#141A24] to-blue-500/5 p-5 shadow-[0_20px_45px_rgba(0,0,0,.18)]"><div className="mb-4 flex items-start gap-3"><div className="rounded-xl border border-purple-400/30 bg-purple-400/10 p-2 text-purple-200"><BrainCircuit className="h-5 w-5" /></div><div><p className="text-[11px] font-mono uppercase tracking-[.18em] text-purple-200">Recovery Analysis · Live metrics</p><h3 className="mt-1 text-lg font-bold text-white">What the recovery data indicates</h3><p className="mt-1 text-sm text-slate-400">Deterministic explainability summaries derived from current playbook, case, and ledger results.</p></div></div><div className="grid gap-3 md:grid-cols-2">{cards.map(card => <details key={card.title} className={`group rounded-xl border ${surfaces[card.color]}`}><summary className="flex cursor-pointer list-none items-center gap-3 p-4"><card.icon className={`h-5 w-5 shrink-0 ${accents[card.color]}`} /><span className="min-w-0 flex-1"><span className={`block text-[10px] font-bold uppercase tracking-wider ${accents[card.color]}`}>{card.label}</span><span className="mt-1 block text-sm font-semibold text-white">{card.title}</span></span><ChevronDown className="h-4 w-4 text-slate-500 transition-transform group-open:rotate-180" /></summary><div className="border-t border-white/10 px-4 pb-4 pt-3"><p className="text-sm font-semibold text-slate-200">{card.summary}</p><p className="mt-2 text-xs leading-relaxed text-slate-400">{card.body}</p></div></details>)}</div></section>;
 }
 
 function ShieldIcon(props: { className?: string }) { return <AlertTriangle {...props} />; }
@@ -157,6 +157,10 @@ export const RecoveryCharts: React.FC<RecoveryChartsProps> = ({ metrics, loading
     recovered: Number(p.recovered || 0),
     rate:      Number(p.recoveryRate || 0),
     count:     Number(p.caseCount || 0),
+    recoveredCount: Number(p.recoveredCount || 0),
+    escalatedCount: Number(p.escalatedCount || 0),
+    stoppedCount: Number(p.stoppedCount || 0),
+    promiseToPayCount: Number(p.promiseToPayCount || 0),
     color:     PLAYBOOK_COLORS[p.playbook] || FALLBACK_COLORS[idx % FALLBACK_COLORS.length],
   }));
 
@@ -406,7 +410,7 @@ export const RecoveryCharts: React.FC<RecoveryChartsProps> = ({ metrics, loading
             <table className="w-full text-xs">
               <thead className="border-b border-[#252D3A] bg-[#080B12]">
                 <tr>
-                  {['Playbook', 'Cases', 'At Risk', 'Recovered', 'Win Rate', 'Progress'].map(h => (
+                  {['Playbook', 'Cases', 'At Risk', 'Recovered', 'Win Rate', 'Outcome mix', 'Progress'].map(h => (
                     <th key={h} className="py-2.5 px-4 text-left font-semibold uppercase tracking-wider text-[#98A2B3] text-[10px]">
                       {h}
                     </th>
@@ -433,6 +437,9 @@ export const RecoveryCharts: React.FC<RecoveryChartsProps> = ({ metrics, loading
                       <span className={`font-bold ${p.rate >= 50 ? 'text-emerald-400' : p.rate >= 25 ? 'text-amber-400' : 'text-rose-400'}`}>
                         {p.rate.toFixed(1)}%
                       </span>
+                    </td>
+                    <td className="py-3 px-4 text-[10px] font-mono text-slate-400 whitespace-nowrap">
+                      R {p.recoveredCount} · E {p.escalatedCount} · S {p.stoppedCount}{p.promiseToPayCount > 0 ? ` · P ${p.promiseToPayCount}` : ''}
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">

@@ -10,7 +10,7 @@ interface PromiseRecord {
   customer_name: string;
   amount: number;
   promise_date: string;
-  status: 'PROMISED' | 'UPCOMING' | 'DUE' | 'KEPT' | 'BROKEN' | 'ESCALATED';
+  status: 'PROMISED' | 'RESCHEDULED' | 'UPCOMING' | 'DUE' | 'KEPT' | 'BROKEN' | 'ESCALATED';
   channel: string;
   created_at: string;
 }
@@ -100,6 +100,12 @@ export const PromiseToPay: React.FC<PromiseToPayProps> = ({ onSelectCase }) => {
           className: 'bg-cyan-950/60 border-cyan-500/40 text-cyan-400',
           icon: Calendar,
         };
+      case 'RESCHEDULED':
+        return {
+          label: 'Rescheduled',
+          className: 'bg-purple-950/60 border-purple-500/40 text-purple-300',
+          icon: RotateCcw,
+        };
       default:
         return {
           label: 'Promised',
@@ -114,7 +120,7 @@ export const PromiseToPay: React.FC<PromiseToPayProps> = ({ onSelectCase }) => {
     kept: promises.filter(p => p.status === 'KEPT').length,
     broken: promises.filter(p => p.status === 'BROKEN').length,
     due: promises.filter(p => p.status === 'DUE').length,
-    upcoming: promises.filter(p => p.status === 'UPCOMING' || p.status === 'PROMISED').length,
+    upcoming: promises.filter(p => p.status === 'UPCOMING' || p.status === 'PROMISED' || p.status === 'RESCHEDULED').length,
     totalAmount: promises.reduce((sum, p) => sum + (p.amount || 0), 0),
     keptAmount: promises.filter(p => p.status === 'KEPT').reduce((sum, p) => sum + (p.amount || 0), 0),
   };

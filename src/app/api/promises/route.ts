@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
           stage: 'EXECUTE_ACTION',
           actor: 'RECOVER_AI_ENGINE',
           action: 'PROMISE_TO_PAY_REGISTERED',
-          result: 'SUCCESS',
+          result: 'ACTION_EXECUTED',
           details: `Formal promise-to-pay registered: ₹${pAmt.toLocaleString('en-IN')} committed for settlement on ${pDate} via ${pChan}.`
         });
 
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
           stage: 'EXECUTE_ACTION',
           actor: 'RECOVER_AI_ENGINE',
           action: 'PROMISE_REMINDER_SENT',
-          result: 'SUCCESS',
+          result: 'ACTION_EXECUTED',
           details: `Autonomous reminder dispatched to ${recCase.customer_email} for committed ₹${recCase.amount.toLocaleString('en-IN')}.`,
         });
         return NextResponse.json({
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
         recCase.status = 'ACTION_IN_PROGRESS';
         recCase.current_step = 'PROMISE_RESCHEDULED';
         db.saveCase(recCase);
-        db.updatePromiseStatus(safeCaseId, 'PROMISED');
+        db.updatePromiseStatus(safeCaseId, 'RESCHEDULED');
 
         db.addAudit({
           id: `aud_ptp_reschedule_${Date.now()}`,
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
           stage: 'EXECUTE_ACTION',
           actor: 'RECOVER_AI_ENGINE',
           action: 'PROMISE_RESCHEDULED',
-          result: 'SUCCESS',
+          result: 'ACTION_EXECUTED',
           details: `Promise-to-pay schedule extended with customer agreement for case ${caseId}.`,
         });
         return NextResponse.json({

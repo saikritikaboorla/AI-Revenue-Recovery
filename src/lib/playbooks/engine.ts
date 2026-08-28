@@ -68,7 +68,7 @@ export class RecoveryPipeline {
         stage: 'DETECT',
         actor: 'RECOVERAI_AUTOMATION_ENGINE',
         action: 'REVENUE_AT_RISK_DETECTED',
-        result: 'SUCCESS',
+        result: 'DETECTED',
         details: `Signal detected: ₹${recCase.amount.toLocaleString('en-IN')} at risk for ${recCase.customer_name}. Reason: ${recCase.failure_reason}`
       };
       db.addAudit(detectAudit);
@@ -100,7 +100,7 @@ export class RecoveryPipeline {
       stage: 'DIAGNOSE',
       actor: 'RECOVERAI_DIAGNOSTIC_RULES',
       action: 'DIAGNOSIS_FORMULATED',
-      result: 'SUCCESS',
+      result: 'DIAGNOSED',
       details: diagnosis
     };
     db.addAudit(diagAudit);
@@ -113,7 +113,7 @@ export class RecoveryPipeline {
       stage: 'DECIDE_PLAYBOOK',
       actor: 'RECOVERAI_DECISION_ENGINE',
       action: 'STRUCTURED_PLAYBOOK_DECISION',
-      result: aiDecision.escalationRequired ? 'ESCALATED' : 'SUCCESS',
+      result: aiDecision.escalationRequired ? 'ESCALATED' : 'DECIDED',
       details: `${aiDecision.detectedIssue}. ${aiDecision.expectedOutcome}`,
       metadata: { aiDecision },
     });
@@ -199,7 +199,7 @@ export class RecoveryPipeline {
       stage: 'EXECUTE_ACTION',
       actor: 'RECOVERAI_PLAYBOOK_RUNNER',
       action: `EXECUTED_${action.toUpperCase()}`,
-      result: 'SUCCESS',
+      result: 'ACTION_EXECUTED',
       details: `Dispatched bounded intervention [${action}] across Razorpay verified rails.`
     };
     db.addAudit(actAudit);
@@ -239,7 +239,7 @@ export class RecoveryPipeline {
         stage: 'VERIFY',
         actor: 'RAZORPAY_WEBHOOK_HANDLER',
         action: 'PAYMENT_CAPTURED_AND_VERIFIED',
-        result: 'SUCCESS',
+        result: 'RECOVERED',
         details: `₹${recCase.amount.toLocaleString('en-IN')} captured. Ledger entry created: ${ledgerEntry.id}`
       }; */
 
@@ -250,7 +250,7 @@ export class RecoveryPipeline {
         stage: 'STOP_OR_ESCALATE',
         actor: 'RECOVERAI_AUTOMATION_ENGINE',
         action: 'WORKFLOW_CLOSED_SUCCESSFULLY',
-        result: 'SUCCESS',
+        result: 'RECOVERED',
         details: `Closed-loop workflow terminated cleanly. Money recovered and accounted.`
       };
 
@@ -269,6 +269,19 @@ export class RecoveryPipeline {
         auditTrail: generatedAudits
       };
     } else {
+      const verificationAudit: AuditRecord = {
+        id: `aud_${recCase.id}_verify_${Date.now()}`,
+        case_id: recCase.id,
+        timestamp: new Date().toISOString(),
+        stage: 'VERIFY',
+        actor: 'RAZORPAY_WEBHOOK_HANDLER',
+        action: 'SETTLEMENT_NOT_CONFIRMED',
+        result: 'NOT_RECOVERED',
+        details: 'Provider did not confirm settlement for this bounded attempt; no recovery ledger entry was written.',
+      };
+      db.addAudit(verificationAudit);
+      generatedAudits.push(verificationAudit);
+
       if (recCase.retry_count >= guardrails.maxRetries) {
         recCase.status = 'ESCALATED';
         recCase.current_step = 'ESCALATED_MAX_RETRIES';

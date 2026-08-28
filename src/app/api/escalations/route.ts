@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
         stage: 'CHECK_GUARDRAILS',
         actor: 'HUMAN_OFFICER',
         action: 'ESCALATION_APPROVED',
-        result: 'SUCCESS',
+        result: 'DECIDED',
         details: `Senior Operations Specialist approved autonomous execution for case ${caseId}. Guardrails overridden with human authority.`
       });
 
