@@ -1,7 +1,10 @@
 import { db, RecoveryCaseRecord, AuditRecord, EscalationRecord } from '../db';
 import { PlaybookType, PLAYBOOK_CONFIGS } from './index';
 import { createAIDecision } from '../ai-decision';
+import { getAIDecision } from '../ai-claude';
 import { formatRetryStatus } from '../guardrails';
+
+const MODEL_LABEL = 'claude-3-5-haiku-20241022';
 
 export interface ExecutionResult {
   success: boolean;
@@ -55,7 +58,7 @@ export class RecoveryPipeline {
     const guardrails = db.getGuardrails();
     const config = PLAYBOOK_CONFIGS[recCase.playbook];
     const customer = db.getCustomerById(recCase.customer_id);
-    const aiDecision = createAIDecision(recCase, guardrails, customer);
+    const aiDecision = await getAIDecision(recCase, guardrails, customer);
     recCase.ai_decision = aiDecision;
 
     // Stage 0: Record DETECT if not present
@@ -111,10 +114,12 @@ export class RecoveryPipeline {
       case_id: recCase.id,
       timestamp: aiDecision.timestamp,
       stage: 'DECIDE_PLAYBOOK',
-      actor: 'RECOVERAI_DECISION_ENGINE',
-      action: 'STRUCTURED_PLAYBOOK_DECISION',
+      actor: aiDecision.source === 'CLAUDE_AI' ? 'CLAUDE_AI_DIAGNOSIS_ENGINE' : 'RECOVERAI_DECISION_ENGINE',
+      action: aiDecision.aiFallbackUsed ? 'DECISION_FALLBACK' : 'STRUCTURED_PLAYBOOK_DECISION',
       result: aiDecision.escalationRequired ? 'ESCALATED' : 'DECIDED',
-      details: `${aiDecision.detectedIssue}. ${aiDecision.expectedOutcome}`,
+      details: aiDecision.aiFallbackUsed
+        ? `Deterministic fallback used (${aiDecision.aiFallbackReason}). ${aiDecision.detectedIssue}. ${aiDecision.expectedOutcome}`
+        : `[AI: ${aiDecision.aiProvider ?? 'Claude'} / ${aiDecision.aiModel ?? MODEL_LABEL}] ${aiDecision.detectedIssue}. Recommended: ${aiDecision.selectedPlaybook}. ${aiDecision.expectedOutcome}`,
       metadata: { aiDecision },
     });
     generatedAudits.push(db.getAuditsByCaseId(caseId).slice(-1)[0]);

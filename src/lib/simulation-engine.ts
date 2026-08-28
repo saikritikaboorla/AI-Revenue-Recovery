@@ -29,6 +29,10 @@ export interface BatchSimulationResult {
   decisionFactors: Record<string, number>;
   recoveryRatePct: number;
   averageExecutionLatencyMs: number;
+  /** Number of cases where a real Claude AI call succeeded */
+  aiAssistedCount: number;
+  /** Number of cases where the deterministic fallback was used */
+  fallbackCount: number;
   cases: Array<{
     id: string;
     customerName: string;
@@ -238,6 +242,8 @@ export class SimulationEngine {
     let failedCount        = 0;
     let predictedRecoverableValue = 0;
     let stoppedCount = 0;
+    let aiAssistedCount = 0;
+    let fallbackCount = 0;
     const decisionDistribution: Record<string, number> = {};
     const decisionFactors: Record<string, number> = {};
     const caseResults: BatchSimulationResult['cases'] = [];
@@ -270,6 +276,14 @@ export class SimulationEngine {
           decision.decisionFactors.forEach(factor => {
             if (factor.signal === 'POSITIVE') decisionFactors[factor.factor] = (decisionFactors[factor.factor] || 0) + 1;
           });
+          // Track AI-assisted vs deterministic fallback
+          if (decision.source === 'CLAUDE_AI' && !decision.aiFallbackUsed) {
+            aiAssistedCount += 1;
+          } else {
+            fallbackCount += 1;
+          }
+        } else {
+          fallbackCount += 1;
         }
 
         caseResults.push({
@@ -321,6 +335,8 @@ export class SimulationEngine {
         // provider/ledger result) while avoiding a misleading rounded zero.
         ? Number(Math.max(0.01, totalExecutionMs / executedCaseCount).toFixed(2))
         : 0,
+      aiAssistedCount,
+      fallbackCount,
       cases: caseResults,
     };
   }

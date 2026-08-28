@@ -44,7 +44,16 @@ export interface AIDecisionRecord {
   escalationRequired: boolean;
   confidence: ConfidenceBand;
   confidencePercent: number;
-  source: 'DETERMINISTIC_LOCAL_DECISION_ENGINE';
+  // AI source metadata — set by ai-claude.ts
+  source: 'DETERMINISTIC_LOCAL_DECISION_ENGINE' | 'CLAUDE_AI';
+  aiProvider?: string;
+  aiModel?: string;
+  aiRootCause?: string;
+  aiReasoning?: string;
+  aiRelevantSignals?: string[];
+  aiRawResponse?: string;
+  aiFallbackUsed?: boolean;
+  aiFallbackReason?: string;
 }
 
 function issueLabel(failureReason: string, playbook?: PlaybookType): string {

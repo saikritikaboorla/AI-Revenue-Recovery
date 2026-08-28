@@ -41,6 +41,10 @@ interface SimulateApiResult {
   stoppedCount?: number;
   decisionDistribution?: Record<string, number>;
   decisionFactors?: Record<string, number>;
+  /** Number of cases processed by real AI (Claude) */
+  aiAssistedCount?: number;
+  /** Number of cases that used deterministic fallback */
+  fallbackCount?: number;
   cases?: Array<{ id: string; customerName: string; amount: number; playbook: string; status: string; recoveredAmount: number; predictedRecoverable: number }>;
 }
 
@@ -465,6 +469,18 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
               <span className="text-[10px] uppercase tracking-wider text-[#98A2B3]">Failed / unrecoverable</span>
               <p className="text-base font-bold text-rose-300">{failed} cases</p>
             </div>
+            {(lastResult.aiAssistedCount !== undefined || lastResult.fallbackCount !== undefined) && (
+              <div className="rounded-lg bg-[#10151F] border border-blue-900/30 p-3 space-y-0.5 sm:col-span-2">
+                <span className="text-[10px] uppercase tracking-wider text-[#98A2B3] flex items-center gap-1">
+                  <Zap className="h-3 w-3 text-blue-400" />
+                  AI Decision Layer
+                </span>
+                <div className="flex gap-4 mt-1">
+                  <span className="text-sm font-bold text-blue-300">{lastResult.aiAssistedCount ?? 0} AI-assisted</span>
+                  <span className="text-sm font-bold text-slate-400">{lastResult.fallbackCount ?? 0} deterministic fallback</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {lastResult.cases && lastResult.cases.length > 0 && (

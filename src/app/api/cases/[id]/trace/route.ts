@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { PLAYBOOK_CONFIGS } from '@/lib/playbooks';
-import { createAIDecision } from '@/lib/ai-decision';
+import { getAIDecision } from '@/lib/ai-claude';
 import { evaluateGuardrails } from '@/lib/guardrails';
 import { formatRetryStatus } from '@/lib/guardrails';
 import { buildHinglishTranscript } from '@/lib/hinglish-engine';
@@ -28,7 +28,7 @@ export async function GET(
     hinglishTranscript.recoveredAmount = ledgerEntries[0]?.recovered_amount || 0;
     hinglishTranscript.settlementVerified = ledgerEntries.length > 0;
   }
-  const aiDecision = recCase.ai_decision || createAIDecision(recCase, guardrails, db.getCustomerById(recCase.customer_id));
+  const aiDecision = recCase.ai_decision || await getAIDecision(recCase, guardrails, db.getCustomerById(recCase.customer_id));
   if (!recCase.ai_decision) {
     recCase.ai_decision = aiDecision;
     db.saveCase(recCase);
@@ -37,10 +37,12 @@ export async function GET(
       case_id: id,
       timestamp: aiDecision.timestamp,
       stage: 'DECIDE_PLAYBOOK',
-      actor: 'RECOVERAI_DECISION_ENGINE',
-      action: 'AUTOMATED_DECISION_REQUESTED',
+      actor: aiDecision.source === 'CLAUDE_AI' ? 'CLAUDE_AI_DIAGNOSIS_ENGINE' : 'RECOVERAI_DECISION_ENGINE',
+      action: aiDecision.aiFallbackUsed ? 'DECISION_FALLBACK' : 'AUTOMATED_DECISION_REQUESTED',
       result: aiDecision.escalationRequired ? 'ESCALATED' : 'DECIDED',
-      details: `${aiDecision.detectedIssue}. ${aiDecision.expectedOutcome}`,
+      details: aiDecision.aiFallbackUsed
+        ? `Deterministic fallback used (${aiDecision.aiFallbackReason}). ${aiDecision.detectedIssue}. ${aiDecision.expectedOutcome}`
+        : `[AI: ${aiDecision.aiProvider ?? 'Claude'} / ${aiDecision.aiModel}] ${aiDecision.detectedIssue}. ${aiDecision.expectedOutcome}`,
       metadata: { aiDecision },
     });
   }
