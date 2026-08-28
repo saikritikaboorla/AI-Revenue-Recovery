@@ -123,72 +123,75 @@ export const Navbar: React.FC = () => {
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b border-[#1E2A3A] bg-[#070A10]/90 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between pl-4 sm:pl-6 lg:pl-8 pr-8 sm:pr-12 lg:pr-16">
+        <div className="w-full max-w-[1920px] mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8 gap-2 sm:gap-4">
 
-          {/* ── Logo ────────────────────────────────────────────────────── */}
-          <div className="flex items-center gap-4 shrink-0">
-            <Link href="/" className="flex items-center gap-2 group" aria-label="RecoverAI Home">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/20 border border-blue-500/40 text-blue-400 group-hover:border-blue-400 group-hover:bg-blue-600/30 transition-all duration-200 shadow-[0_0_12px_rgba(59,130,246,0.2)]">
+          {/* ── 1. Left: Brand / Logo ─────────────────────────────────── */}
+          <div className="flex items-center shrink-0">
+            <Link href="/" className="flex items-center gap-2.5 group" aria-label="RecoverAI Home">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/20 border border-blue-500/40 text-blue-400 group-hover:border-blue-400 group-hover:bg-blue-600/30 transition-all duration-200 shadow-[0_0_12px_rgba(59,130,246,0.2)] shrink-0">
                 <Zap className="h-4 w-4" />
               </div>
               <div className="flex flex-col leading-none">
                 <span className="text-sm font-bold tracking-tight text-[#F0F4FF] group-hover:text-blue-400 transition-colors duration-200">
                   RecoverAI
                 </span>
-                <span className="text-[9px] tracking-widest uppercase font-medium text-[#5A6478] mt-px">
+                <span className="text-[9px] tracking-widest uppercase font-medium text-[#5A6478] mt-0.5">
                   Deterministic Revenue Recovery
                 </span>
               </div>
             </Link>
-
-            {/* ── Desktop nav links (2xl+) ──────────────────────────────── */}
-            <nav className="hidden 2xl:flex items-center gap-0.5 ml-3" aria-label="Primary navigation">
-              {NAV_ITEMS.map((item) => {
-                const Icon = item.icon;
-                const active = isItemActive(item, pathname, hash);
-                return (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    onClick={(e) => handleNavClick(e, item)}
-                    className={[
-                      'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-all duration-150',
-                      active
-                        ? 'bg-blue-600/15 text-blue-400 border border-blue-500/30 shadow-[0_0_8px_rgba(59,130,246,0.15)]'
-                        : 'text-[#8B98B0] hover:text-[#F0F4FF] hover:bg-[#10151F] border border-transparent',
-                    ].join(' ')}
-                    aria-current={active ? 'page' : undefined}
-                  >
-                    <Icon className="h-3 w-3 shrink-0" />
-                    <span className="whitespace-nowrap">{item.label}</span>
-                  </Link>
-                );
-              })}
-            </nav>
           </div>
 
-          {/* ── Right side controls ─────────────────────────────────────── */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/50 border border-emerald-500/25 text-emerald-400">
-              <span className="relative flex h-2 w-2">
+          {/* ── 2. Center: Flexible Desktop Nav Links ─────────────────── */}
+          <nav className="hidden xl:flex flex-1 min-w-0 items-center justify-center gap-0.5 2xl:gap-1 px-1 2xl:px-3" aria-label="Primary navigation">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const active = isItemActive(item, pathname, hash);
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  onClick={(e) => handleNavClick(e, item)}
+                  className={[
+                    'flex items-center gap-1.5 px-2 2xl:px-2.5 py-1.5 rounded-md text-[11px] 2xl:text-xs font-medium transition-all duration-150 shrink-0',
+                    active
+                      ? 'bg-blue-600/15 text-blue-400 border border-blue-500/30 shadow-[0_0_8px_rgba(59,130,246,0.15)]'
+                      : 'text-[#8B98B0] hover:text-[#F0F4FF] hover:bg-[#10151F] border border-transparent',
+                  ].join(' ')}
+                  aria-current={active ? 'page' : undefined}
+                >
+                  <Icon className="h-3 w-3 shrink-0" />
+                  <span className="whitespace-nowrap">{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* ── 3. Right: Status & Action Controls (Fixed Priority) ──── */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Live Engine Status Badge */}
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/50 border border-emerald-500/25 text-emerald-400 shrink-0">
+              <span className="relative flex h-2 w-2 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
               </span>
               <span className="text-[10px] font-mono font-medium whitespace-nowrap">Recovery Engine Live</span>
             </div>
 
+            {/* Launch CTA */}
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 px-3.5 py-2 text-xs font-semibold text-white transition-all duration-150 shadow-[0_0_16px_rgba(59,130,246,0.35)] hover:shadow-[0_0_22px_rgba(59,130,246,0.55)] whitespace-nowrap cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 px-3 sm:px-3.5 py-2 text-xs font-semibold text-white transition-all duration-150 shadow-[0_0_16px_rgba(59,130,246,0.35)] hover:shadow-[0_0_22px_rgba(59,130,246,0.55)] whitespace-nowrap cursor-pointer shrink-0"
             >
               <Activity className="h-4 w-4 shrink-0 text-white" />
               <span className="hidden sm:inline">Open Command Center</span>
               <span className="sm:hidden">Command Center</span>
             </Link>
 
+            {/* Mobile Hamburger Toggle */}
             <button
               type="button"
-              className="2xl:hidden flex items-center justify-center h-9 w-9 rounded-lg border border-[#1E2A3A] bg-[#0D1117] text-[#8B98B0] hover:text-[#F0F4FF] hover:border-[#243040] transition-all duration-150 cursor-pointer"
+              className="xl:hidden flex items-center justify-center h-9 w-9 rounded-lg border border-[#1E2A3A] bg-[#0D1117] text-[#8B98B0] hover:text-[#F0F4FF] hover:border-[#243040] transition-all duration-150 cursor-pointer shrink-0"
               onClick={() => setMobileOpen((v) => !v)}
               aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
               aria-expanded={mobileOpen}
