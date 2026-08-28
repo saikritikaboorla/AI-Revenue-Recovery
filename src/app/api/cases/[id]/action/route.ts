@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { RecoveryPipeline } from '@/lib/playbooks/engine';
 import { db } from '@/lib/db';
+import { errorMessage, isRecord } from '@/lib/api-validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,10 +12,11 @@ export async function POST(
   const { id } = await params;
   try {
     const body = await request.json().catch(() => ({}));
-    const forceApproval = body?.forceApproval === true;
+    if (!isRecord(body)) throw new Error('A JSON object is required');
+    const forceApproval = body.forceApproval === true;
     const result = await RecoveryPipeline.processCase(id, { forceApproval });
     return NextResponse.json(result);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Workflow execution failed' }, { status: 400 });
+    return NextResponse.json({ error: errorMessage(err, 'Workflow execution failed') }, { status: 400 });
   }
 }

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Navbar } from '@/components/Navbar';
 import { LoadingScreen } from '@/components/LoadingScreen';
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 import {
   Zap,
   Activity,
@@ -153,7 +154,7 @@ export default function LandingPage() {
 
   // Fetch live metrics
   useEffect(() => {
-    fetch('/api/metrics')
+    fetchWithTimeout('/api/metrics', {}, 10000)
       .then(res => res.json())
       .then((data: Metrics) => {
         setMetrics(data);
@@ -231,7 +232,7 @@ export default function LandingPage() {
           {/* Precision Badge */}
           <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-[11px] sm:text-xs font-semibold tracking-[0.12em] uppercase mb-12 sm:mb-16 shadow-[0_0_25px_rgba(59,130,246,0.18)] backdrop-blur-md">
             <Zap className="h-4 w-4 text-blue-400 shrink-0" />
-            Autonomous Closed-Loop Revenue Recovery Agent
+            Deterministic Closed-Loop Revenue Recovery Engine
           </div>
 
           {/* Large Bold Hero Headline */}
@@ -290,7 +291,7 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 relative">
               {[
                 { step: '01', title: 'Revenue At Risk', desc: 'Webhook catches dropoffs & bank declines', color: 'border-amber-500/30 bg-amber-500/5 text-amber-400' },
-                { step: '02', title: 'Automated Detection', desc: 'Classifies root failure code & risk factor', color: 'border-blue-500/30 bg-blue-500/5 text-blue-400' },
+                { step: '02', title: 'Automated Detection', desc: 'Deterministic context analysis of root failure code & risk factor', color: 'border-blue-500/30 bg-blue-500/5 text-blue-400' },
                 { step: '03', title: 'Recovery Decision', desc: 'Selects optimal bounded playbook & rails', color: 'border-purple-500/30 bg-purple-500/5 text-purple-400' },
                 { step: '04', title: 'Recovery Action', desc: 'Dispatches a bounded gateway or customer outreach action', color: 'border-cyan-500/30 bg-cyan-500/5 text-cyan-400' },
                 { step: '05', title: 'Verified Revenue', desc: 'Verified settlement written to ledger', color: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-400' },
@@ -488,7 +489,7 @@ export default function LandingPage() {
               </div>
               <div>
                 <p className="text-sm font-extrabold text-[#F0F4FF] leading-none">RecoverAI</p>
-                <p className="text-xs text-[#3B4F6A] mt-0.5">AI Revenue Recovery Platform</p>
+                <p className="text-xs text-[#3B4F6A] mt-0.5">Deterministic Revenue Recovery Platform</p>
               </div>
             </div>
 
@@ -496,7 +497,7 @@ export default function LandingPage() {
             <p className="text-xs text-[#3B4F6A] text-center sm:text-right leading-relaxed max-w-md">
               Built with Next.js App Router · OGL Galaxy · GSAP FoldText · Razorpay Rail Simulator
               <br />
-              <span className="text-[#4B6A9B]">Razorpay AI Buildathon Submission</span>
+              <span className="text-[#4B6A9B]">Razorpay Buildathon Submission</span>
             </p>
           </div>
         </footer>

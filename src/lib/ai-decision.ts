@@ -48,7 +48,7 @@ export interface AIDecisionRecord {
 }
 
 function issueLabel(failureReason: string, playbook?: PlaybookType): string {
-  if (playbook === 'HINGLISH_RECOVERY') return 'Checkout drop-off / payment assistance';
+  if (playbook === 'HINGLISH_RECOVERY') return 'Payment authorization assistance';
   if (playbook === 'MANDATE_RETRY') return 'Mandate retry timing issue';
   if (playbook === 'CHECKOUT_ABANDONMENT') return 'Checkout abandonment';
   if (playbook === 'PAYMENT_DEGRADATION') return 'Payment degradation';
@@ -77,7 +77,8 @@ function diagnosisFor(recCase: RecoveryCaseRecord, issue: string): string {
   const reason = recCase.failure_reason.replace(/_/g, ' ').toLowerCase();
   const context = `${recCase.customer_segment.replace(/_/g, ' ')} customer, risk ${recCase.customer_risk_score}/100`;
   if (issue === 'Payment degradation') return `Issuer or gateway degradation was classified from ${reason}; retry/failover is evaluated as a transient recovery path (${context}).`;
-  if (issue === 'Checkout abandonment' || issue === 'Checkout drop-off / payment assistance') return `Checkout intent ended before authorization (${reason}); the case is routed to the ${recCase.playbook === 'HINGLISH_RECOVERY' ? 'Hinglish conversational' : 'checkout recovery'} channel while it remains recoverable (${context}).`;
+  if (issue === 'Checkout abandonment') return `Checkout intent ended before authorization (${reason}); the case is routed to the checkout recovery channel while it remains recoverable (${context}).`;
+  if (issue === 'Payment authorization assistance') return `Payment authorization was not completed (${reason}); the case is routed to the Hinglish conversational recovery channel while it remains recoverable (${context}).`;
   if (issue === 'Failed subscription or mandate') return `Recurring payment could not complete because of ${reason}; the subscription recovery playbook is evaluated against mandate and retry limits.`;
   if (issue === 'Overdue receivable') return `Receivable remains unpaid after ${reason}; collection action is bounded by amount, risk, retry, and human-escalation policy.`;
   return `Recovery event classified as ${reason} using the case failure signal and current customer risk context.`;

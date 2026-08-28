@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, UserCheck, ShieldAlert, ArrowUpRight, Check, X, RefreshCw } from 'lucide-react';
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 
 interface EscalationsViewProps {
   onSelectCase: (caseId: string) => void;
@@ -17,13 +18,13 @@ export const EscalationsView: React.FC<EscalationsViewProps> = ({ onSelectCase }
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/escalations');
+      const res = await fetchWithTimeout('/api/escalations', {}, 10000);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setEscalations(data.escalations || []);
     } catch (err) {
       console.error('Failed to load escalations:', err);
-      setError('Unable to load escalation records. Please refresh.');
+      setError('Unable to load escalation records. Please refresh or retry.');
     } finally {
       setLoading(false);
     }
@@ -36,11 +37,11 @@ export const EscalationsView: React.FC<EscalationsViewProps> = ({ onSelectCase }
   const handleDecision = async (caseId: string, action: 'APPROVE' | 'REJECT') => {
     setActionLoading(caseId + action);
     try {
-      await fetch('/api/escalations', {
+      await fetchWithTimeout('/api/escalations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ caseId, action })
-      });
+      }, 15000);
       await fetchEscalations();
     } catch (err) {
       console.error('Decision error:', err);

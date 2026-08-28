@@ -12,6 +12,7 @@ import { AuditTrailView } from '@/components/AuditTrailView';
 import { EscalationsView } from '@/components/EscalationsView';
 import { PromiseToPay } from '@/components/PromiseToPay';
 import { LedgerProofModal } from '@/components/LedgerProofModal';
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 import {
   ShieldCheck,
   RefreshCw,
@@ -154,8 +155,8 @@ export default function DashboardPage() {
     setDataError(null);
     try {
       const [mRes, cRes] = await Promise.all([
-        fetch('/api/metrics'),
-        fetch('/api/cases'),
+        fetchWithTimeout('/api/metrics', {}, 10000),
+        fetchWithTimeout('/api/cases', {}, 10000),
       ]);
       if (!mRes.ok || !cRes.ok) throw new Error('API error');
       const mData = await mRes.json();
@@ -181,11 +182,11 @@ export default function DashboardPage() {
   const handleRunWorkflow = useCallback(async (caseId: string, forceApproval?: boolean) => {
     setProcessingId(caseId);
     try {
-      const res = await fetch(`/api/cases/${caseId}/action`, {
+      const res = await fetchWithTimeout(`/api/cases/${caseId}/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ forceApproval }),
-      });
+      }, 30000);
       const data = await res.json();
 
       if (!res.ok) {
@@ -219,6 +220,12 @@ export default function DashboardPage() {
     await fetchData(true);
   }, [fetchData]);
 
+  const handleResetState = useCallback(async () => {
+    setSelectedCaseId(null);
+    setShowLedgerProof(false);
+    await fetchData(true);
+  }, [fetchData]);
+
   const accent = TAB_ACCENTS[activeTab];
 
   return (
@@ -236,11 +243,14 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2.5">
               <div className="h-3 w-3 rounded-full animate-pulse" style={{ backgroundColor: accent.color, boxShadow: `0 0 14px ${accent.glow}` }} />
               <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#F5F7FA]">
-                AI Revenue Recovery Command Center
+                RecoverAI Command Center
               </h1>
             </div>
             <p className="text-sm sm:text-base text-[#98A2B3] mt-2">
-              Autonomous Closed-Loop Engine: Detect → Diagnose → Decide → Act → Verify → Stop
+              Deterministic closed-loop engine: Detect → Diagnose → Decide → Act → Verify → Stop
+            </p>
+            <p className="mt-2 max-w-2xl text-xs text-[#7D8BA3]">
+              Diagnosis and playbook ranking use a deterministic decision engine in this prototype. Guardrail checks are separately deterministic rule evaluation. No live model call is made per case in this build.
             </p>
           </div>
 
@@ -308,7 +318,7 @@ export default function DashboardPage() {
 
           {activeTab === 'simulation' && (
             <div className="space-y-6">
-              <SimulationRunner onSimulationComplete={handleSimulationComplete} />
+              <SimulationRunner onSimulationComplete={handleSimulationComplete} onResetState={handleResetState} />
               <RecoveryQueue
                 cases={cases}
                 loading={loading}

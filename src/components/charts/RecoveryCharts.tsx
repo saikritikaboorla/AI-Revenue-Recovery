@@ -63,7 +63,7 @@ function SummaryCard({
   );
 }
 
-function AIAnalysisSection({ playbookData, atRisk, recovered, rate, escalated, active, total, ledger }: { playbookData: Array<{ fullName: string; atRisk: number; recovered: number; rate: number; count: number }>; atRisk: number; recovered: number; rate: number; escalated: number; active: number; total: number; ledger: number }) {
+function RecoveryAnalysisSection({ playbookData, atRisk, recovered, rate, escalated, active, total, ledger }: { playbookData: Array<{ fullName: string; atRisk: number; recovered: number; rate: number; count: number }>; atRisk: number; recovered: number; rate: number; escalated: number; active: number; total: number; ledger: number }) {
   const largestExposure = playbookData.reduce((largest, current) => current.atRisk > largest.atRisk ? current : largest, { fullName: 'No playbook data', atRisk: 0, recovered: 0, rate: 0, count: 0 });
   const strongestPlaybook = playbookData.filter(item => item.count > 0).sort((a, b) => b.rate - a.rate)[0];
   const exposureShare = atRisk > 0 ? Math.round((largestExposure.atRisk / atRisk) * 100) : 0;
@@ -222,7 +222,7 @@ export const RecoveryCharts: React.FC<RecoveryChartsProps> = ({ metrics, loading
         />
       </div>
 
-      <AIAnalysisSection playbookData={playbookData} atRisk={atRisk} recovered={recovered} rate={rate} escalated={escalated} active={active} total={total} ledger={ledger} />
+      <RecoveryAnalysisSection playbookData={playbookData} atRisk={atRisk} recovered={recovered} rate={rate} escalated={escalated} active={active} total={total} ledger={ledger} />
 
       {/* ── Playbook Revenue Charts ────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

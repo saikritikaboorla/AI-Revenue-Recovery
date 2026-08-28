@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   ChevronDown,
 } from 'lucide-react';
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 
 // ─── Stage config ─────────────────────────────────────────────────────────────
 
@@ -111,7 +112,7 @@ export const AuditTrailView: React.FC = () => {
       const params = new URLSearchParams({ limit: '300' });
       if (stageFilter !== 'ALL') params.set('stage', stageFilter);
 
-      const res = await fetch(`/api/audit?${params.toString()}`);
+      const res = await fetchWithTimeout(`/api/audit?${params.toString()}`, {}, 10000);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setEvents(data.audits || []);

@@ -13,6 +13,7 @@ import {
   Layers
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 
 // The /api/simulate endpoint returns a shape from RecoveryPipeline.runBatch
 // which is slightly different from BatchSimulationResult in simulation-engine.
@@ -45,6 +46,7 @@ interface SimulateApiResult {
 
 interface SimulationRunnerProps {
   onSimulationComplete: () => void;
+  onResetState?: () => void;
 }
 
 const PRESET_SIZES = [10, 25, 50, 100] as const;
@@ -73,7 +75,7 @@ function formatINR(value: number): string {
   return `₹${value.toLocaleString('en-IN')}`;
 }
 
-export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulationComplete }) => {
+export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulationComplete, onResetState }) => {
   const [batchSize, setBatchSize] = useState<number>(10);
   const [customInput, setCustomInput] = useState<string>('10');
   const [isSimulating, setIsSimulating] = useState(false);
@@ -126,11 +128,11 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
     startFakeProgress();
 
     try {
-      const res = await fetch('/api/simulate', {
+      const res = await fetchWithTimeout('/api/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ batchSize, autonomousAutoExecute: true })
-      });
+      }, 30000);
 
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${await res.text()}`);
@@ -176,12 +178,13 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
     setErrorMessage(null);
     setResetMessage(null);
     try {
-      const response = await fetch('/api/cases', { method: 'DELETE' });
+      const response = await fetchWithTimeout('/api/cases', { method: 'DELETE' }, 10000);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       setLastResult(null);
       setProgress(0);
       setProgressMessage('');
       onSimulationComplete();
+      onResetState?.();
       setResetMessage('Demo state reset: overview, analytics, escalations, promises, audit, and queue now reflect the seed state.');
     } catch (err) {
       console.error('Reset failed:', err);

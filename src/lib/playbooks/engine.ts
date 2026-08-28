@@ -1,4 +1,4 @@
-import { db, RecoveryCaseRecord, AuditRecord, RecoveryLedgerRecord, EscalationRecord } from '../db';
+import { db, RecoveryCaseRecord, AuditRecord, EscalationRecord } from '../db';
 import { PlaybookType, PLAYBOOK_CONFIGS } from './index';
 import { createAIDecision } from '../ai-decision';
 import { formatRetryStatus } from '../guardrails';
@@ -66,7 +66,7 @@ export class RecoveryPipeline {
         case_id: recCase.id,
         timestamp: recCase.created_at || now,
         stage: 'DETECT',
-        actor: 'RECOVER_AI_ENGINE',
+        actor: 'RECOVERAI_AUTOMATION_ENGINE',
         action: 'REVENUE_AT_RISK_DETECTED',
         result: 'SUCCESS',
         details: `Signal detected: ₹${recCase.amount.toLocaleString('en-IN')} at risk for ${recCase.customer_name}. Reason: ${recCase.failure_reason}`
@@ -98,7 +98,7 @@ export class RecoveryPipeline {
       case_id: recCase.id,
       timestamp: now,
       stage: 'DIAGNOSE',
-      actor: 'RECOVER_AI_DIAGNOSTIC_MODEL',
+      actor: 'RECOVERAI_DIAGNOSTIC_RULES',
       action: 'DIAGNOSIS_FORMULATED',
       result: 'SUCCESS',
       details: diagnosis
@@ -111,7 +111,7 @@ export class RecoveryPipeline {
       case_id: recCase.id,
       timestamp: aiDecision.timestamp,
       stage: 'DECIDE_PLAYBOOK',
-      actor: 'RECOVER_AI_DECISION_SERVICE',
+      actor: 'RECOVERAI_DECISION_ENGINE',
       action: 'STRUCTURED_PLAYBOOK_DECISION',
       result: aiDecision.escalationRequired ? 'ESCALATED' : 'SUCCESS',
       details: `${aiDecision.detectedIssue}. ${aiDecision.expectedOutcome}`,
@@ -197,7 +197,7 @@ export class RecoveryPipeline {
       case_id: recCase.id,
       timestamp: new Date().toISOString(),
       stage: 'EXECUTE_ACTION',
-      actor: 'RECOVER_AI_PLAYBOOK_RUNNER',
+      actor: 'RECOVERAI_PLAYBOOK_RUNNER',
       action: `EXECUTED_${action.toUpperCase()}`,
       result: 'SUCCESS',
       details: `Dispatched bounded intervention [${action}] across Razorpay verified rails.`
@@ -213,14 +213,10 @@ export class RecoveryPipeline {
     const isSuccess = Math.random() < winProbability;
 
     if (isSuccess) {
-      recCase.status = 'RECOVERED';
-      recCase.current_step = 'VERIFIED_STOPPED';
-      recCase.recovered_amount = recCase.amount;
-      recCase.recovered_at = new Date().toISOString();
-      recCase.last_action_result = `Razorpay Webhook (payment.captured) verified: ₹${recCase.amount.toLocaleString('en-IN')} captured.`;
+      const ledgerEntry = db.settleCase(recCase.id, recCase.amount, 'RAZORPAY_WEBHOOK_VERIFIED');
 
-      // 100% Guaranteed Write to Recovery Ledger
-      const ledgerEntry: RecoveryLedgerRecord = {
+      /* legacy implementation retained for reference:
+      const legacyLedgerEntry: any = {
       // Scope the ledger key to the case so fast batch executions cannot
       // overwrite one another when they happen in the same millisecond.
       id: `ledg_${recCase.id}_${Date.now().toString().slice(-6)}`,
@@ -234,34 +230,34 @@ export class RecoveryPipeline {
         verified_at: recCase.recovered_at,
         idempotency_key: `idemp_${recCase.id}_${recCase.recovered_at.slice(0, 10)}`
       };
-      db.addLedger(ledgerEntry);
+      db.addLedger(legacyLedgerEntry); */
 
-      const verAudit: AuditRecord = {
+      /* const legacyVerificationAudit: AuditRecord = {
         id: `aud_${recCase.id}_ver_${Date.now()}`,
         case_id: recCase.id,
-        timestamp: recCase.recovered_at,
+        timestamp: recCase.recovered_at || new Date().toISOString(),
         stage: 'VERIFY',
         actor: 'RAZORPAY_WEBHOOK_HANDLER',
         action: 'PAYMENT_CAPTURED_AND_VERIFIED',
         result: 'SUCCESS',
         details: `₹${recCase.amount.toLocaleString('en-IN')} captured. Ledger entry created: ${ledgerEntry.id}`
-      };
+      }; */
 
       const stopAudit: AuditRecord = {
         id: `aud_${recCase.id}_stop_${Date.now()}`,
         case_id: recCase.id,
-        timestamp: recCase.recovered_at,
+        timestamp: recCase.recovered_at || new Date().toISOString(),
         stage: 'STOP_OR_ESCALATE',
-        actor: 'RECOVER_AI_ENGINE',
+        actor: 'RECOVERAI_AUTOMATION_ENGINE',
         action: 'WORKFLOW_CLOSED_SUCCESSFULLY',
         result: 'SUCCESS',
         details: `Closed-loop workflow terminated cleanly. Money recovered and accounted.`
       };
 
-      db.addAudit(verAudit);
       db.addAudit(stopAudit);
-      generatedAudits.push(verAudit, stopAudit);
-      db.saveCase(recCase);
+      const verificationAudit = db.getAuditsByCaseId(recCase.id).find(a => a.action === 'SETTLEMENT_VERIFIED_AND_LEDGER_WRITTEN');
+      if (verificationAudit) generatedAudits.push(verificationAudit);
+      generatedAudits.push(stopAudit);
 
       return {
         success: true,

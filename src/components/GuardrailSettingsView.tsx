@@ -15,6 +15,7 @@ import {
   PhoneCall,
   Users,
 } from 'lucide-react';
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 
 interface GuardrailPolicy {
   maxRetries: number;
@@ -22,7 +23,7 @@ interface GuardrailPolicy {
   highValueThreshold: number;
   maxRiskScoreForAutonomousAction: number;
   dailyContactLimit: number;
-  enableVoiceAiForEnterpriseOnly: boolean;
+  enableAssistedVoiceForEnterpriseOnly: boolean;
 }
 
 const DEFAULTS: GuardrailPolicy = {
@@ -31,7 +32,7 @@ const DEFAULTS: GuardrailPolicy = {
   highValueThreshold: 100000,
   maxRiskScoreForAutonomousAction: 65,
   dailyContactLimit: 2,
-  enableVoiceAiForEnterpriseOnly: false,
+  enableAssistedVoiceForEnterpriseOnly: false,
 };
 
 interface RuleCardConfig {
@@ -107,7 +108,7 @@ const RULE_CARDS: RuleCardConfig[] = [
     step: 1,
   },
   {
-    key: 'enableVoiceAiForEnterpriseOnly',
+    key: 'enableAssistedVoiceForEnterpriseOnly',
     label: 'Enable Assisted Voice for Enterprise Only',
     description:
       'When enabled, assisted Voice IVR calls are restricted to ENTERPRISE and HIGH_LTV_VIP customer segments only. Reduces cost-per-intervention on lower-value segments while maximizing premium recovery.',
@@ -176,7 +177,7 @@ export const GuardrailSettingsView: React.FC = () => {
 
   useEffect(() => {
     setLoading(true);
-    fetch('/api/guardrails')
+    fetchWithTimeout('/api/guardrails', {}, 10000)
       .then((res) => res.json())
       .then((data: Partial<GuardrailPolicy>) => {
         // Merge with defaults so we never have undefined values
@@ -204,11 +205,11 @@ export const GuardrailSettingsView: React.FC = () => {
     setSaving(true);
     setSaveError(null);
     try {
-      const res = await fetch('/api/guardrails', {
+      const res = await fetchWithTimeout('/api/guardrails', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings),
-      });
+      }, 15000);
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Unknown error' }));
         throw new Error(err.error || `HTTP ${res.status}`);

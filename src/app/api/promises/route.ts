@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { db } from '@/lib/db';
+import { errorMessage, isRecord, optionalDate, optionalFiniteNumber, requiredString } from '@/lib/api-validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!isRecord(body)) throw new Error('A JSON object is required');
     const { caseId, action, promiseDate, amount, channel } = body as {
       caseId?: string;
       action?: string;
@@ -26,30 +28,33 @@ export async function POST(req: NextRequest) {
       channel?: string;
     };
 
-    if (!caseId || !action) {
-      return NextResponse.json(
-        { error: 'caseId and action are required' },
-        { status: 400 }
-      );
-    }
+    const safeCaseId = requiredString(caseId, 'caseId');
+    const safeAction = requiredString(action, 'action').toUpperCase();
+    const safeAmount = optionalFiniteNumber(amount, 'amount');
+    if (safeAmount !== undefined && safeAmount <= 0) throw new Error('amount must be greater than 0');
+    const safePromiseDate = optionalDate(promiseDate, 'promiseDate');
 
-    const recCase = db.getCaseById(caseId);
+    const recCase = db.getCaseById(safeCaseId);
     if (!recCase) {
       return NextResponse.json(
-        { error: `Case ${caseId} not found` },
+        { error: `Case ${safeCaseId} not found` },
         { status: 404 }
       );
     }
 
     // Handle promise follow-up actions
-    switch (action) {
+    switch (safeAction) {
       case 'CREATE': {
-        const pDate = promiseDate || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-        const pAmt = amount || recCase.amount;
+        const existingPromise = db.getPromiseByCaseId(safeCaseId);
+        if (existingPromise) {
+          return NextResponse.json({ success: true, idempotent: true, message: `Promise already exists for case ${safeCaseId}`, promise: existingPromise });
+        }
+        const pDate = safePromiseDate || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        const pAmt = safeAmount ?? recCase.amount;
         const pChan = channel || 'WhatsApp / SMS';
         const newPromise = {
           id: `prom_${Date.now().toString().slice(-6)}`,
-          case_id: caseId,
+          case_id: safeCaseId,
           customer_name: recCase.customer_name,
           amount: pAmt,
           promise_date: pDate,
@@ -65,7 +70,7 @@ export async function POST(req: NextRequest) {
 
         db.addAudit({
           id: `aud_ptp_create_${Date.now()}`,
-          case_id: caseId,
+          case_id: safeCaseId,
           timestamp: new Date().toISOString(),
           stage: 'EXECUTE_ACTION',
           actor: 'RECOVER_AI_ENGINE',
@@ -76,60 +81,28 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({
           success: true,
-          message: `Promise created for case ${caseId}`,
+          message: `Promise created for case ${safeCaseId}`,
           promise: newPromise,
         });
       }
 
       case 'MARK_KEPT': {
-        const recoveredAt = new Date().toISOString();
         if (recCase.status !== 'RECOVERED') {
-          recCase.status = 'RECOVERED';
-          recCase.recovered_amount = recCase.amount;
-          recCase.recovered_at = recoveredAt;
-          recCase.current_step = 'VERIFIED_STOPPED';
-          recCase.last_action_result = `Promise-to-pay kept. Customer settled ₹${recCase.amount.toLocaleString('en-IN')}.`;
-          db.saveCase(recCase);
-
-          // Write to recovery ledger
-          const ledgerEntry = {
-            id: `ledg_ptp_${Date.now().toString().slice(-6)}`,
-            case_id: caseId,
-            customer_id: recCase.customer_id,
-            amount_at_risk: recCase.amount,
-            recovered_amount: recCase.amount,
-            currency: recCase.currency || 'INR',
-            playbook: recCase.playbook,
-            verification_source: 'PROMISE_TO_PAY_SETTLED_VERIFIED',
-            verified_at: recoveredAt,
-            idempotency_key: `idemp_ptp_${caseId}_${recoveredAt.slice(0, 10)}`
-          };
-          db.addLedger(ledgerEntry);
-
-          db.addAudit({
-            id: `aud_ptp_kept_${Date.now()}`,
-            case_id: caseId,
-            timestamp: recoveredAt,
-            stage: 'VERIFY',
-            actor: 'RAZORPAY_WEBHOOK_HANDLER',
-            action: 'PROMISE_HONORED_SETTLED',
-            result: 'SUCCESS',
-            details: `Promise-to-pay fulfilled. ₹${recCase.amount.toLocaleString('en-IN')} verified & written to ledger (${ledgerEntry.id}).`
-          });
+          db.settleCase(safeCaseId, db.getPromiseByCaseId(safeCaseId)?.amount || recCase.amount, 'PROMISE_TO_PAY_SETTLED_VERIFIED');
         }
-        db.updatePromiseStatus(caseId, 'KEPT');
+        db.updatePromiseStatus(safeCaseId, 'KEPT');
 
         return NextResponse.json({
           success: true,
-          message: `Promise for case ${caseId} marked as KEPT and ledger updated`,
-          caseId,
+          message: `Promise for case ${safeCaseId} marked as KEPT and ledger updated`,
+          caseId: safeCaseId,
           action,
           updatedStatus: recCase.status,
         });
       }
 
       case 'MARK_BROKEN': {
-        db.updatePromiseStatus(caseId, 'BROKEN');
+        db.updatePromiseStatus(safeCaseId, 'BROKEN');
         if (recCase.status !== 'ESCALATED') {
           recCase.status = 'ESCALATED';
           recCase.current_step = 'ESCALATED_BROKEN_PROMISE';
@@ -139,7 +112,7 @@ export async function POST(req: NextRequest) {
 
           db.addEscalation({
             id: `esc_ptp_${Date.now().toString().slice(-6)}`,
-            case_id: caseId,
+            case_id: safeCaseId,
             customer_name: recCase.customer_name,
             amount: recCase.amount,
             playbook: recCase.playbook,
@@ -152,7 +125,7 @@ export async function POST(req: NextRequest) {
 
           db.addAudit({
             id: `aud_ptp_broken_${Date.now()}`,
-            case_id: caseId,
+            case_id: safeCaseId,
             timestamp: new Date().toISOString(),
             stage: 'STOP_OR_ESCALATE',
             actor: 'GUARDRAIL_COMPLIANCE_MONITOR',
@@ -163,8 +136,8 @@ export async function POST(req: NextRequest) {
         }
         return NextResponse.json({
           success: true,
-          message: `Promise for case ${caseId} marked as BROKEN and escalated`,
-          caseId,
+          message: `Promise for case ${safeCaseId} marked as BROKEN and escalated`,
+          caseId: safeCaseId,
           action,
           updatedStatus: recCase.status,
         });
@@ -173,7 +146,7 @@ export async function POST(req: NextRequest) {
       case 'SEND_REMINDER': {
         db.addAudit({
           id: `aud_ptp_remind_${Date.now()}`,
-          case_id: caseId,
+          case_id: safeCaseId,
           timestamp: new Date().toISOString(),
           stage: 'EXECUTE_ACTION',
           actor: 'RECOVER_AI_ENGINE',
@@ -184,7 +157,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           success: true,
           message: `Reminder sent for case ${caseId}`,
-          caseId,
+          caseId: safeCaseId,
           action,
         });
       }
@@ -193,11 +166,11 @@ export async function POST(req: NextRequest) {
         recCase.status = 'ACTION_IN_PROGRESS';
         recCase.current_step = 'PROMISE_RESCHEDULED';
         db.saveCase(recCase);
-        db.updatePromiseStatus(caseId, 'PROMISED');
+        db.updatePromiseStatus(safeCaseId, 'PROMISED');
 
         db.addAudit({
           id: `aud_ptp_reschedule_${Date.now()}`,
-          case_id: caseId,
+          case_id: safeCaseId,
           timestamp: new Date().toISOString(),
           stage: 'EXECUTE_ACTION',
           actor: 'RECOVER_AI_ENGINE',
@@ -207,8 +180,8 @@ export async function POST(req: NextRequest) {
         });
         return NextResponse.json({
           success: true,
-          message: `Promise for case ${caseId} rescheduled`,
-          caseId,
+          message: `Promise for case ${safeCaseId} rescheduled`,
+          caseId: safeCaseId,
           action,
           updatedStatus: recCase.status,
         });
@@ -216,13 +189,13 @@ export async function POST(req: NextRequest) {
 
       default:
         return NextResponse.json(
-          { error: `Unknown action: ${action}. Valid actions: CREATE, MARK_KEPT, MARK_BROKEN, SEND_REMINDER, RESCHEDULE` },
+          { error: `Unknown action: ${safeAction}. Valid actions: CREATE, MARK_KEPT, MARK_BROKEN, SEND_REMINDER, RESCHEDULE` },
           { status: 400 }
         );
     }
   } catch (err: any) {
     return NextResponse.json(
-      { error: err.message || 'Failed to process promise action' },
+      { error: errorMessage(err, 'Failed to process promise action') },
       { status: 500 }
     );
   }

@@ -1,408 +1,153 @@
-# RecoverAI — AI Revenue Recovery
+# RecoverAI
 
-**Find revenue that's slipping away and win it back, automatically.**
+**Find revenue that is slipping away and win it back.**
 
-RecoverAI is an agentic system that watches your payment and receivables data, figures out *why* money is at risk, selects the right intervention from a bounded playbook set, executes a recovery workflow, and writes an immutable audit trail of every action and every rupee recovered.
+RecoverAI is a deterministic revenue-recovery prototype. It detects seeded or
+simulated revenue-risk cases, diagnoses the recorded failure context, selects
+one bounded playbook, evaluates guardrails, runs a mock/provider-backed action,
+and records verified recovery in a canonical ledger with an audit trail.
 
-> **Status:** Prototype / Hackathon build. Uses a Razorpay mock adapter by default — no live payment credentials required to run.
+> **Prototype disclosure:** Diagnosis and playbook ranking use a deterministic
+> decision engine in this prototype. Guardrail checks are separately
+> deterministic rule evaluation. No live model call is made per case in this
+> build. The default Razorpay adapter is a mock and does not move real money.
 
----
+## What is implemented
 
-## Table of Contents
+The dashboard at `/dashboard` contains these existing views:
 
-1. [What This Does](#what-this-does)
-2. [How It Works — The Loop](#how-it-works--the-loop)
-3. [Recovery Playbooks](#recovery-playbooks)
-4. [Tech Stack](#tech-stack)
-5. [Architecture](#architecture)
-6. [Project Structure](#project-structure)
-7. [Getting Started](#getting-started)
-8. [Environment Variables](#environment-variables)
-9. [API Routes](#api-routes)
-10. [Data Model](#data-model)
-11. [Guardrails & Stopping Rules](#guardrails--stopping-rules)
-12. [Dashboard Views](#dashboard-views)
-13. [Known Limitations](#known-limitations)
-14. [Roadmap](#roadmap)
-
----
-
-## What This Does
-
-RecoverAI is a Next.js 16 web app and autonomous agent that does three things a revenue-ops team would otherwise do manually:
-
-1. **Detects** revenue at risk — a failed payment, abandoned checkout, subscription that failed to renew, overdue B2B invoice, or failed e-NACH mandate.
-2. **Diagnoses** the root cause — bank downtime, OTP timeout, mandate limit exceeded, insufficient funds, customer drop-off — and scores recovery confidence.
-3. **Recovers** the money — picks one bounded action (gateway failover, WhatsApp link, IVR call, NACH reschedule, discount offer, or human escalation), executes it through the Razorpay adapter, and logs every step in an append-only audit trail.
-
-The dashboard is the control tower: live recovery queue, playbook analytics charts, batch simulator, escalation approvals, promise-to-pay tracker, audit log, and configurable guardrail policy — all in a single Next.js app with no separate backend process.
-
----
-
-## How It Works — The Loop
-
-```
-EVENT → DETECT → DIAGNOSE → RISK SCORE → SELECT PLAYBOOK → GUARDRAIL CHECK → EXECUTE ACTION → VERIFY → WRITE LEDGER → STOP / ESCALATE
-```
-
-Every case that enters the loop gets a unique case ID. Every step above is written to an append-only audit log so nothing the agent does is a black box.
-
-**Nine pipeline stages (as rendered in the landing page):**
-
-| Stage | What Happens |
+| View | Functionality |
 |---|---|
-| Detect | Webhook / poll catches a failure or overdue event in real time |
-| Diagnose | Deep contextual reasoning: LTV, error codes, banking latency |
-| Risk Score | Probabilistic recovery confidence with weighted decision factors |
-| Select Playbook | Maps failure signature to the optimal bounded recovery strategy |
-| Guardrail Check | Max-retry, cooldown, contact-cap, and value-threshold gates |
-| Execute Action | WhatsApp link, gateway failover, IVR call, or NACH reschedule |
-| Verify | Razorpay webhook confirms successful settlement |
-| Write Ledger | Immutable append-only entry written to recovery ledger |
-| Measure Recovery | Win-rate, recovered value, and agent attribution updated |
+| Overview / Command Center | At-risk value, verified recovered value, recovery rate, active cases, and recent activity. |
+| Recovery Queue | Search and filter cases by playbook/status, open a case trace, and run a recovery workflow. |
+| Playbook Analytics | Recovered versus at-risk values, category/playbook performance, and recovery trends from the same ledger-backed metrics. |
+| Batch Simulator | Generate 1–100 synthetic cases, run the bounded pipeline, and show batch totals and case outcomes. |
+| Escalations | Review guardrail-triggered cases and approve or reject them. |
+| Promise-to-Pay | Create commitments and test reminder, reschedule, kept, and broken states. Kept commitments write verified settlement state. |
+| Guardrails | View and update retry, cooldown, risk, value, contact, and voice-policy settings for the session. |
+| Audit | Inspect the append-only event trail by stage and case. |
 
----
+## Recovery playbooks
 
-## Recovery Playbooks
+The decision engine supports seven playbook types. The detected issue is the
+root cause/context; the playbook is the bounded recovery channel or strategy.
+The Case Trace shows both so the relationship is explicit.
 
-Seven self-contained playbooks. The agent picks exactly one per case and may only call actions within that playbook's `allowedActions` list.
+| Playbook | Implemented prototype behavior |
+|---|---|
+| Payment Degradation | Gateway/failover-style recovery actions for failed payment context. |
+| Checkout Abandonment | Resume-link, quick-pay, or settlement-incentive actions. |
+| Failed Subscription | Payment-method update, authorization-link, or grace-period actions. |
+| B2B Overdue Receivables | Payment link, early-payment incentive, or relationship-manager escalation. |
+| Mandate Retry | Scheduled retry, split charge, or mandate-update action. |
+| Hinglish Recovery | Bilingual outreach path with a clearly labelled simulated voice preview; no real call is placed. |
+| Promise-to-Pay | Commitment tracking, reminders, rescheduling, kept settlement, and broken-promise escalation. |
 
-| # | Playbook | Trigger Event | Allowed Actions | Max Retries |
-|---|---|---|---|---|
-| 1 | **Payment Degradation & Gateway Failover** | `payment.failed` (bank/gateway timeout) | `switch_gateway_optimizer`, `instant_upi_failover`, `card_network_switch` | 3 |
-| 2 | **Checkout Abandonment Cart Recovery** | `checkout.session_expired_without_auth` | `send_checkout_resume_link`, `apply_instant_settlement_discount`, `whatsapp_quickpay` | 2 |
-| 3 | **Recurring Subscription Invoicing** | `subscription.charge_failed` (mandate limit) | `request_payment_method_update`, `send_afa_authorization_link`, `offer_grace_period` | 3 |
-| 4 | **B2B Overdue Invoices & Receivables** | `invoice.overdue_net30_breached` | `create_payment_link`, `apply_5pct_early_discount`, `escalate_to_relationship_manager` | 2 |
-| 5 | **e-NACH & Mandate Clearing Reschedule** | `mandate.debit_declined_insufficient_funds` | `schedule_morning_batch_retry`, `split_mandate_charge`, `notify_mandate_update` | 3 |
-| 6 | **Hinglish Conversational AI Assist** | `payment.dropped_upi_intent` | `send_hinglish_whatsapp_prompt`, `dispatch_assisted_ivr_call`, `send_upi_intent_qr` | 2 |
-| 7 | **Promise-to-Pay (P2P) Tracker** | `customer.promise_to_pay_created` | `create_promise_to_pay`, `send_milestone_reminder`, `escalate_broken_promise` | 1 |
+## Recovery loop
 
----
+```text
+DETECT → DIAGNOSE → DECIDE PLAYBOOK → CHECK GUARDRAILS → EXECUTE ACTION
+→ VERIFY → WRITE LEDGER → STOP OR ESCALATE
+```
 
-## Tech Stack
+Verified recoveries use one canonical settlement path. A recovered case has a
+non-zero verified amount, settlement proof, one idempotent ledger record, and a
+corresponding verification audit event. Seeded recovered cases are hydrated
+the same way, without duplicate ledger or settlement events on refresh.
 
-This is what is **actually used** in the codebase — no aspirational stack items.
-
-| Layer | What's Used | Details |
-|---|---|---|
-| **Framework** | Next.js 16.3.3 (App Router) | Single monolith — both frontend and all API routes live here. No separate backend process. |
-| **Language** | TypeScript 5 | Strict types throughout (`src/lib/types.ts` defines all domain models) |
-| **React** | React 19.2.8 | All components are Client Components (`"use client"`) |
-| **Styling** | Tailwind CSS v4 + `tailwind-merge` | Dark-mode dashboard with custom CSS variables in `globals.css` |
-| **Animation** | Framer Motion 13 + GSAP 3.15 | Page transitions, micro-interactions, loading screen |
-| **3D / WebGL** | Three.js 0.185 + OGL 1.0 | Galaxy background on landing page (browser-only, `ssr: false`) |
-| **Charts** | Recharts 3.10 | Playbook analytics: bar charts, area charts, pie charts |
-| **Icons** | Lucide React 1.34 | All dashboard icons |
-| **Confetti** | canvas-confetti 1.9 | Recovery celebration effect |
-| **State / Data Store** | In-memory singleton (`DatabaseService`) | No external database. All data lives in server-side Maps seeded from CSV files at startup. |
-| **Seed Data** | CSV files in `data/seed/` | `customers.csv`, `recovery_cases.csv`, `audit_log.csv`, `recovery_ledger.csv`, `escalations.csv`, `promises.csv` |
-| **Payment Adapter** | Razorpay mock adapter (`RazorpayService`) | Falls back to a high-fidelity mock when `RAZORPAY_KEY_ID` is not set. Supports live test mode with real credentials. |
-| **Agent Engine** | `RecoveryAgentEngine` + `RecoveryPipeline` | Pure TypeScript decision engine — no LLM API called at runtime. Uses a deterministic decision matrix keyed on failure reason, customer segment, and guardrail state. |
-| **Simulation Engine** | `SimulationEngine` | Generates synthetic cases (1–100 batch) and runs them through the full pipeline. Probabilistic win/loss outcome. |
-| **Hosting** | Vercel (`.vercel/project.json` present) | `next build` + `next start` or Vercel serverless |
-| **Package Manager** | npm (lockfile version 3) | |
-| **Linter** | ESLint 9 + `eslint-config-next` | |
-
-### Why no LLM / Claude API at runtime?
-
-The agent is intentionally a **constrained decision function**, not a free-form model call. A deterministic decision matrix (`agent-engine.ts`, `playbooks/engine.ts`) maps each combination of failure reason + customer segment + guardrail state to exactly one playbook and one action. This keeps the system:
-
-- **Auditable** — every decision is fully reproducible and explainable without a model trace.
-- **Bounded** — the agent cannot invent actions outside the allowed set.
-- **Zero-latency** — no API round-trip on the critical recovery path.
-- **Demo-safe** — runs fully offline with no external API keys required.
-
----
+Expected outcomes are not technical failures: `NOT_RECOVERED`, `ESCALATED`,
+and `BLOCKED` represent business/guardrail outcomes. `FAILED` is reserved for
+an unexpected execution or system failure.
 
 ## Architecture
 
-```
-Browser
-  │
-  ├── / (Landing Page)          → page.tsx — Galaxy WebGL, pipeline explainer, playbook cards
-  └── /dashboard                → dashboard/page.tsx — 7-tab control tower
-        │
-        ├── Recovery Queue      → RecoveryQueue.tsx + GET /api/cases
-        ├── Playbook Analytics  → RecoveryCharts.tsx + GET /api/metrics
-        ├── Batch Simulator     → SimulationRunner.tsx + POST /api/simulate
-        ├── Escalations         → EscalationsView.tsx + GET /api/escalations
-        ├── Promise-to-Pay      → PromiseToPay.tsx + GET /api/promises
-        ├── Audit Trail         → AuditTrailView.tsx + GET /api/audit
-        └── Guardrail Policy    → GuardrailSettingsView.tsx + GET|PATCH /api/guardrails
+- **Framework:** Next.js 16 App Router, React 19, TypeScript 5.
+- **Styling and UI:** Tailwind CSS v4, existing dark visual theme, Framer Motion,
+  GSAP, Three.js/OGL landing-page effects, Lucide icons, and Recharts.
+- **Server state:** `DatabaseService`, an in-memory server-side singleton seeded
+  from `data/seed/*.csv`.
+- **Decisioning:** deterministic TypeScript logic in `src/lib/ai-decision.ts`
+  and `src/lib/playbooks/engine.ts`; no LLM dependency.
+- **Payments:** `RazorpayService`; mock mode is used when credentials are not
+  configured. Test credentials can enable the adapter's test mode.
+- **Hosting:** Vercel. Current deployment:
+  <https://ai-revenue-recovery-flame.vercel.app/>
 
-Next.js API Routes (src/app/api/)
-  ├── GET  /api/cases                → list all cases (filter: playbook, status, search)
-  ├── GET  /api/cases/[id]           → single case with full audit + decisions
-  ├── POST /api/cases/[id]/action    → run RecoveryPipeline.processCase(id)
-  ├── GET  /api/metrics              → dashboard KPIs from DatabaseService
-  ├── POST /api/simulate             → SimulationEngine.runBatchSimulation(config)
-  ├── GET  /api/escalations          → list escalations
-  ├── GET  /api/promises             → list promise-to-pay records
-  ├── GET  /api/audit                → recent 100 audit events (or by caseId)
-  ├── GET|PATCH /api/guardrails      → read/update guardrail policy
-  └── GET  /api/health               → server health check
+This is one Next.js application. There is no external database, Redis worker,
+authentication layer, live webhook ingestion service, messaging provider, or
+telephony system in this repository.
 
-Server-side Singleton (Node.js process memory)
-  └── DatabaseService (src/lib/db/index.ts)
-        ├── customers: Map<id, CustomerRecord>       ← seeded from customers.csv
-        ├── cases: Map<id, RecoveryCaseRecord>       ← seeded from recovery_cases.csv
-        ├── ledger: Map<id, RecoveryLedgerRecord>    ← seeded from recovery_ledger.csv
-        ├── audits: AuditRecord[]                    ← seeded from audit_log.csv
-        ├── escalations: Map<id, EscalationRecord>   ← seeded from escalations.csv
-        ├── promises: Map<id, PromiseRecord>         ← seeded from promises.csv
-        └── guardrails: GuardrailPolicy              ← in-memory defaults, PATCH via API
-```
+## Local setup
 
-> **Important:** Because `DatabaseService` is a server-side in-memory singleton, data resets on every server restart/cold start. This is intentional for a prototype — add a real database (Postgres/PlanetScale) to make it persistent.
-
----
-
-## Project Structure
-
-```
-AI-Revenue-Recovery/
-├── src/
-│   ├── app/
-│   │   ├── page.tsx                    # Landing page (Galaxy, pipeline explainer, playbooks)
-│   │   ├── layout.tsx                  # Root layout — fonts, metadata
-│   │   ├── globals.css                 # Tailwind + custom dark theme CSS variables
-│   │   ├── error.tsx                   # Root error boundary
-│   │   ├── dashboard/
-│   │   │   ├── page.tsx                # 7-tab dashboard (Client Component)
-│   │   │   └── error.tsx               # Dashboard error boundary
-│   │   └── api/
-│   │       ├── cases/
-│   │       │   ├── route.ts            # GET /api/cases
-│   │       │   └── [id]/
-│   │       │       ├── route.ts        # GET /api/cases/[id]
-│   │       │       └── action/
-│   │       │           └── route.ts    # POST /api/cases/[id]/action
-│   │       ├── metrics/route.ts        # GET /api/metrics
-│   │       ├── simulate/route.ts       # POST /api/simulate
-│   │       ├── escalations/route.ts    # GET /api/escalations
-│   │       ├── promises/route.ts       # GET /api/promises
-│   │       ├── audit/route.ts          # GET /api/audit
-│   │       ├── guardrails/route.ts     # GET|PATCH /api/guardrails
-│   │       └── health/route.ts         # GET /api/health
-│   │
-│   ├── components/
-│   │   ├── Navbar.tsx                  # Top navigation bar with live metrics ticker
-│   │   ├── LoadingScreen.tsx           # Animated loading screen with progress steps
-│   │   ├── MetricsOverview.tsx         # KPI cards: at-risk, recovered, recovery rate
-│   │   ├── RecoveryQueue.tsx           # Live case list with filter/search + action trigger
-│   │   ├── DecisionTraceModal.tsx      # Modal: full agent decision trace + audit timeline
-│   │   ├── SimulationRunner.tsx        # Batch simulator UI (1–100 cases, live progress)
-│   │   ├── GuardrailSettingsView.tsx   # Guardrail policy editor (sliders + toggles)
-│   │   ├── AuditTrailView.tsx          # Append-only audit log table with stage badges
-│   │   ├── EscalationsView.tsx         # Escalations list + approve/reject actions
-│   │   ├── PromiseToPay.tsx            # P2P tracker with status badges and calendar dates
-│   │   ├── charts/
-│   │   │   └── RecoveryCharts.tsx      # Recharts: playbook bar, category pie, area trend
-│   │   ├── effects/
-│   │   │   ├── Galaxy.tsx              # Three.js / OGL galaxy particle system (WebGL)
-│   │   │   ├── Galaxy.css              # Galaxy canvas styles
-│   │   │   ├── FoldText.tsx            # GSAP animated fold/reveal text effect
-│   │   │   ├── GhostCursor.tsx         # Ghost trail cursor effect
-│   │   │   └── GlowCursor.tsx          # Glow cursor effect
-│   │   └── ui/                         # Shared primitive UI components
-│   │
-│   ├── lib/
-│   │   ├── types.ts                    # All TypeScript domain types
-│   │   ├── store.ts                    # RecoverAIStore (legacy in-memory store, used by agent-engine)
-│   │   ├── agent-engine.ts             # RecoveryAgentEngine: diagnose+decide+execute (store-backed)
-│   │   ├── simulation-engine.ts        # SimulationEngine: batch case generation + pipeline
-│   │   ├── razorpay-adapter.ts         # RazorpayService: live test mode + mock fallback
-│   │   ├── db/
-│   │   │   └── index.ts                # DatabaseService: CSV-seeded in-memory Maps
-│   │   └── playbooks/
-│   │       ├── index.ts                # PlaybookType enum + PLAYBOOK_CONFIGS
-│   │       └── engine.ts               # RecoveryPipeline: full 9-stage processing
-│   │
-│   └── data/                           # (legacy) static seed data referenced by store.ts
-│
-├── data/
-│   └── seed/                           # CSV seed files loaded by DatabaseService at startup
-│       ├── customers.csv               # 20 synthetic Indian customer profiles
-│       ├── recovery_cases.csv          # ~100 pre-seeded recovery cases across all playbooks
-│       ├── audit_log.csv               # ~500 audit events across seeded cases
-│       ├── recovery_ledger.csv         # Verified recovery ledger entries
-│       ├── escalations.csv             # Pre-seeded escalation records
-│       └── promises.csv                # Pre-seeded promise-to-pay records
-│
-├── public/                             # Static assets (SVGs)
-├── package.json                        # npm dependencies (see Tech Stack)
-├── next.config.ts                      # Next.js config
-├── tsconfig.json                       # TypeScript config
-├── postcss.config.mjs                  # PostCSS + Tailwind v4
-├── eslint.config.mjs                   # ESLint 9 flat config
-└── .env.example                        # Environment variable template
-```
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 20+
-- npm 10+
-- No database, no Redis, no external API keys required to run locally
-
-### Setup
+Requirements: Node.js 20+ and npm 10+.
 
 ```bash
-# 1. Clone and enter the repo
-git clone <your-repo-url> AI-Revenue-Recovery
-cd AI-Revenue-Recovery
-
-# 2. Install dependencies
 npm install
-
-# 3. (Optional) Copy env file and add Razorpay test credentials
-#    Without credentials the Razorpay mock adapter activates automatically
-cp .env.example .env
-
-# 4. Run the dev server
 npm run dev
-# → http://localhost:3000
 ```
 
-That's it. The app seeds all data from CSV files in `data/seed/` on first request. No migrations, no docker, no worker process.
+Open <http://localhost:3000>. No external service is required for the demo.
 
-### Production Build
+Production validation commands:
 
 ```bash
+npx tsc --noEmit
 npm run build
 npm run start
 ```
 
----
+## API surface
 
-## Environment Variables
-
-| Variable | Required | Purpose |
+| Method | Route | Purpose |
 |---|---|---|
-| `RAZORPAY_KEY_ID` | Optional | Razorpay test-mode key. If omitted, the mock adapter runs automatically. |
-| `RAZORPAY_KEY_SECRET` | Optional | Razorpay test-mode secret. |
-| `NEXT_PUBLIC_APP_URL` | Optional | Public base URL (used for link generation). Defaults to `http://localhost:3000`. |
-| `NODE_ENV` | Auto-set | `development` / `production` |
+| GET | `/api/cases` | List/filter cases using `status`, `playbook`, and `search`. |
+| GET | `/api/cases/:id` | Return a case and its audits. |
+| POST | `/api/cases/:id/action` | Run the recovery pipeline; accepts `forceApproval` for approved escalation execution. |
+| GET | `/api/cases/:id/decision` | Return or persist the deterministic decision summary. |
+| GET | `/api/cases/:id/trace` | Return case, audits, guardrails, decision factors, ledger, promise, and proof. |
+| GET | `/api/metrics` | Return dashboard aggregates. |
+| POST | `/api/simulate` | Run a synthetic batch; `batchSize` is clamped to 1–100. |
+| GET/POST | `/api/escalations` | List or approve/reject escalation records. |
+| GET/POST | `/api/promises` | List or mutate promise-to-pay records. |
+| GET | `/api/ledger` | Return ledger entries and verified totals, optionally by `case_id`. |
+| GET | `/api/audit` | Return audit events with optional `case_id`, `stage`, `limit`, and `offset`. |
+| GET/POST | `/api/guardrails` | Read or update the in-memory guardrail policy. |
+| DELETE | `/api/cases` | Reset runtime state to the CSV seed state. |
+| GET | `/api/health` | Report application and Razorpay adapter health/mode. |
 
-No database URL, no Redis URL, no auth secrets required. The app runs fully on in-memory state seeded from CSV files.
+## Environment variables
 
----
-
-## API Routes
-
-All routes are Next.js App Router route handlers under `src/app/api/`.
-
-| Method | Route | Description |
+| Variable | Required | Meaning |
 |---|---|---|
-| `GET` | `/api/cases` | List all cases. Query params: `playbook`, `status`, `search` |
-| `GET` | `/api/cases/[id]` | Single case with decisions, interventions, and audit logs |
-| `POST` | `/api/cases/[id]/action` | Trigger full recovery pipeline on a case |
-| `GET` | `/api/metrics` | Dashboard KPIs: totals, recovery rate, playbook breakdown, recent recoveries |
-| `POST` | `/api/simulate` | Run batch simulation. Body: `{ batchSize: number (1–100) }` |
-| `GET` | `/api/escalations` | List all escalation records |
-| `POST` | `/api/escalations` | Approve or reject an escalation |
-| `GET` | `/api/promises` | List all promise-to-pay records |
-| `GET` | `/api/audit` | Last 100 audit events. Query param: `caseId` to filter |
-| `GET` | `/api/guardrails` | Current guardrail policy |
-| `PATCH` | `/api/guardrails` | Update guardrail policy (persists in-memory for session) |
-| `GET` | `/api/health` | Health check — returns `{ status: "ok" }` |
+| `RAZORPAY_KEY_ID` | No | Enables Razorpay test-mode configuration when paired with the secret. |
+| `RAZORPAY_KEY_SECRET` | No | Razorpay test-mode secret; never expose it to client code. |
+| `NEXT_PUBLIC_APP_URL` | No | Public URL used for generated links. |
 
----
+The repository ignores `.env*`. Never commit real credentials.
 
-## Data Model
+## Known limitations
 
-### `RecoveryCaseRecord`
-One row per revenue-at-risk event. Fields include `id`, `customer_*`, `amount`, `currency`, `playbook`, `failure_reason`, `status`, `recovery_confidence`, `recovered_amount`, `retry_count`, `diagnosis_summary`, `rationale`, `escalation_reason`, `escalated_to`.
+- State is in memory and resets on restart or cold start; it is not a durable production ledger.
+- Seed data and Batch Simulator are the available detection sources; no live provider webhook route exists.
+- The default provider integration is a mock, so demo recoveries are not real payment captures.
+- Hinglish is a simulated transcript/preview, not telephony, speech recognition, or a completed phone call.
+- There is no authentication, authorization model, or role-based access control.
+- INR is the assumed display and ledger currency.
+- Guardrail settings persist only for the current server process.
+- No automated browser test suite is included; manual/API validation is documented below.
 
-**Status progression:**
-```
-DETECTED → DIAGNOSING → DECIDED → ACTION_IN_PROGRESS → RECOVERED
-                                                      → ESCALATED
-                                                      → STOPPED_MAX_RETRIES
-```
+## Problem-statement alignment
 
-### `AuditRecord`
-Append-only. One row per pipeline stage executed on a case. Fields: `id`, `case_id`, `timestamp`, `stage`, `actor`, `action`, `result`, `details`.
+The prototype demonstrates the requested closed loop and measured batch
+recovery: detection from cases, deterministic diagnosis, bounded playbook
+selection, guardrail enforcement, recovery outcomes, verified ledger totals,
+human escalation, Promise-to-Pay tracking, and audit history.
 
-**Stages:** `DETECT` → `DIAGNOSE` → `DECIDE_PLAYBOOK` → `CHECK_GUARDRAILS` → `EXECUTE_ACTION` → `VERIFY` → `STOP_OR_ESCALATE`
+It partially demonstrates “AI Revenue Recovery” rather than delivering a
+production AI agent. The “AI” is product branding; runtime decisioning is
+deterministic. The strongest judge-ready proof is the Batch Simulator plus a
+Case Trace where queue amount, verified amount, ledger entry, audit event, and
+aggregate metrics agree.
 
-**Actors:** `RECOVER_AI_DIAGNOSTIC_MODEL`, `RECOVER_AI_PLAYBOOK_RUNNER`, `GUARDRAIL_COMPLIANCE_MONITOR`, `RAZORPAY_WEBHOOK_HANDLER`, `RECOVER_AI_ENGINE`
-
-### `RecoveryLedgerRecord`
-One row per verified recovery. Linked to its case. Amount is only written here when Razorpay (or the mock adapter) confirms capture — not on prediction. Fields include `idempotency_key` to prevent double-counting.
-
-### `EscalationRecord`
-Created when a guardrail triggers human review. Status: `PENDING` → `APPROVED` / `REJECTED` / `RESOLVED`.
-
-### `PromiseRecord`
-Tracks customer settlement commitments. Status: `PROMISED` → `UPCOMING` → `DUE` → `KEPT` / `BROKEN` / `ESCALATED`.
-
-### `GuardrailPolicy`
-In-memory, editable via `PATCH /api/guardrails`. Fields:
-
-| Field | Default | Meaning |
-|---|---|---|
-| `maxRetries` | 3 | Max automated retry attempts before escalation |
-| `cooldownHours` | 0.25 | Minimum gap between retries (15 min) |
-| `maxRiskScoreForAutonomousAction` | 65 | Risk scores above this require human approval |
-| `highValueThreshold` | ₹1,00,000 | Amounts above this require human approval |
-| `dailyContactLimit` | 2 | Max customer contacts per day per case |
-| `enableVoiceAiForEnterpriseOnly` | false | Restricts IVR/voice playbook to ENTERPRISE segment |
-
----
-
-## Guardrails & Stopping Rules
-
-The agent will **not** execute an autonomous action if any of these conditions are true:
-
-- `retry_count >= guardrails.maxRetries` (max retries reached)
-- `customer_risk_score > guardrails.maxRiskScoreForAutonomousAction` (risk too high)
-- `amount > guardrails.highValueThreshold` (value too high for autonomous action)
-
-In all three cases the case is moved to `ESCALATED` status, an `EscalationRecord` is created and assigned to a human ops specialist, and the audit log records which guardrail triggered.
-
-All guardrail thresholds are configurable live from the dashboard's **Guardrail Policy** tab without redeployment.
-
----
-
-## Dashboard Views
-
-The `/dashboard` page has seven tabs:
-
-| Tab | Component | What It Shows |
-|---|---|---|
-| Recovery Queue | `RecoveryQueue.tsx` | Live list of all cases. Filter by playbook/status/search. Click a case to open the Decision Trace modal with full agent reasoning + audit timeline. Click "Run Recovery" to trigger the pipeline. |
-| Playbook Analytics | `RecoveryCharts.tsx` | Bar chart of recovery rate per playbook, area chart of recovery over time, pie chart of case distribution by category |
-| Batch Simulator | `SimulationRunner.tsx` | Generates 1–100 synthetic cases and runs them through the full pipeline. Shows live progress, per-case result table, and batch summary metrics. |
-| Escalations & Approvals | `EscalationsView.tsx` | Cases that hit a guardrail. Approve or reject to unblock or close. |
-| Promise-to-Pay | `PromiseToPay.tsx` | Tracks customer settlement commitments, due dates, and status. |
-| Immutable Audit Trail | `AuditTrailView.tsx` | Append-only log of all pipeline events with stage, actor, action, result, and timestamp. |
-| Guardrail Policy | `GuardrailSettingsView.tsx` | Live editor for all guardrail thresholds. Changes take effect immediately for new cases. |
-
----
-
-## Known Limitations
-
-- **In-memory only.** All data resets on server restart. For persistence, replace `DatabaseService` with a Postgres/PlanetScale adapter.
-- **No authentication.** The dashboard has no login. Add NextAuth.js or Clerk before any production use.
-- **Deterministic agent, not LLM-powered.** The decision engine is a hand-coded decision matrix, not a live model call. This is intentional for demo reliability and auditability.
-- **Razorpay mock adapter.** Without real credentials, no actual payment operations are performed. The mock returns realistic-looking responses.
-- **Single currency (INR).** The ledger math and display assume Indian Rupees.
-- **No real-time webhooks.** Cases are updated by API calls from the dashboard, not by live Razorpay webhooks (though the data model and audit log are designed to support them).
-- **Prototype compliance.** No PCI-scope review has been done. Do not connect to live cardholder data without a compliance pass.
-
----
-
-## Roadmap
-
-- [ ] Persistent database (Postgres) — replace in-memory `DatabaseService`
-- [ ] Live Razorpay webhook ingestion (`/api/webhooks/razorpay`)
-- [ ] Dashboard authentication (NextAuth.js or Clerk)
-- [ ] Configurable playbook parameters from UI (retry counts, message copy, thresholds)
-- [ ] A/B testing of nudge copy and timing
-- [ ] Multi-currency ledger support
-- [ ] Role-based access control for the approval queue
-- [ ] LLM-assisted diagnosis step (Claude function calling for edge cases)
+See [`Documentation.md`](Documentation.md) for the feature inventory,
+validation report, usability review, and prioritized gaps.

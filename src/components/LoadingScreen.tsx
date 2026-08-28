@@ -6,7 +6,7 @@ interface LoadingScreenProps { loading: boolean; }
 
 const STAGES = [
   { at: 0, progress: 14, label: 'Initializing recovery engine...' },
-  { at: 420, progress: 38, label: 'Loading recovery intelligence...' },
+  { at: 420, progress: 38, label: 'Loading deterministic decision engine...' },
   { at: 900, progress: 63, label: 'Connecting recovery pipeline...' },
   { at: 1200, progress: 92, label: 'Preparing command center...' },
   { at: 1380, progress: 96, label: 'Verifying guardrails...' },
@@ -47,7 +47,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ loading }) => {
             <span className="intro-tile-corner intro-tile-corner--tl" /><span className="intro-tile-corner intro-tile-corner--tr" /><span className="intro-tile-corner intro-tile-corner--bl" /><span className="intro-tile-corner intro-tile-corner--br" />
           </div>
         </div>
-        <div className="intro-copy mt-12 sm:mt-14"><p className="intro-eyebrow">AI REVENUE RECOVERY</p><h1>RecoverAI</h1><p className="intro-title">INITIALIZING REVENUE RECOVERY</p></div>
+        <div className="intro-copy mt-12 sm:mt-14"><p className="intro-eyebrow">AUTOMATED RECOVERY ENGINE</p><h1>RecoverAI</h1><p className="intro-title">INITIALIZING REVENUE RECOVERY</p></div>
         <div className="intro-progress mt-8 w-full max-w-sm text-left">
           <div className="intro-progress-meta"><span>{current.label}</span><span>{String(current.progress).padStart(2, '0')}%</span></div>
           <div className="intro-progress-track"><span className="intro-progress-segments" /><span className="intro-progress-fill" style={{ width: `${current.progress}%` }} /></div>

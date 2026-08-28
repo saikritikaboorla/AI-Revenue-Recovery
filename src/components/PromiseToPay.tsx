@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Target, RefreshCw, CheckCircle2, AlertTriangle, Clock, Calendar, MessageSquare, Check, X, Bell, RotateCcw } from 'lucide-react';
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 
 interface PromiseRecord {
   id: string;
@@ -29,7 +30,7 @@ export const PromiseToPay: React.FC<PromiseToPayProps> = ({ onSelectCase }) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/promises');
+      const res = await fetchWithTimeout('/api/promises', {}, 10000);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setPromises(data.promises || []);
@@ -49,11 +50,11 @@ export const PromiseToPay: React.FC<PromiseToPayProps> = ({ onSelectCase }) => {
     setActionLoading(caseId + action);
     setActionError(null);
     try {
-      const res = await fetch('/api/promises', {
+      const res = await fetchWithTimeout('/api/promises', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ caseId, action })
-      });
+      }, 15000);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `HTTP ${res.status}`);
@@ -181,9 +182,10 @@ export const PromiseToPay: React.FC<PromiseToPayProps> = ({ onSelectCase }) => {
 
       {/* Content */}
       {loading ? (
-        <div className="py-10 flex flex-col items-center justify-center gap-3 text-slate-400">
-          <RefreshCw className="h-6 w-6 animate-spin text-indigo-400" />
-          <span className="text-xs">Loading promise-to-pay records...</span>
+        <div className="space-y-3 py-4" role="status" aria-label="Loading promise-to-pay panel" aria-busy="true">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="h-12 animate-pulse rounded-lg border border-[#252D3A] bg-[#10151F]" />
+          ))}
         </div>
       ) : error ? (
         <div className="py-8 flex flex-col items-center justify-center gap-3 text-rose-400 text-xs text-center">

@@ -51,9 +51,9 @@ export class RecoveryAgentEngine {
             lossProbability = 0.80;
           } else if (transaction.failureReason === 'AUTH_FAILED_OTP_TIMEOUT') {
             if (customer.segment === 'HIGH_LTV_VIP' || customer.segment === 'ENTERPRISE') {
-              selectedIntervention = 'AI_VOICE_IVR_AUTHORIZATION';
+              selectedIntervention = 'VOICE_IVR_AUTHORIZATION';
               diagnosis = 'High-value cardholder OTP latency. Customer actively engaged in checkout session.';
-              rationale = 'Initiated real-time assisted Voice Bridge to supply instant 1-tap card re-authorization token.';
+              rationale = 'Used a simulated voice authorization preview for instant card re-authorization guidance.';
               recoveryConfidence = 90;
               lossProbability = 0.70;
             } else {
@@ -185,10 +185,10 @@ export class RecoveryAgentEngine {
         verificationMethod = 'Payment Link Capture Webhook';
         break;
 
-      case 'AI_VOICE_IVR_AUTHORIZATION':
-        channel = 'RecoverAI Telephony Voice Gateway';
+      case 'VOICE_IVR_AUTHORIZATION':
+        channel = 'Simulated voice preview / assisted recovery channel';
         details = { ivrSessionId: `ivr_${Date.now()}`, customerConfirmed: true };
-        verificationMethod = 'Voice 2FA Authorization & Direct Debit';
+        verificationMethod = 'Simulated voice authorization preview';
         break;
 
       case 'SMART_RETRY_DOWNTIME_OPTIMAL':

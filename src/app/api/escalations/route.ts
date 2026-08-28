@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { RecoveryPipeline } from '@/lib/playbooks/engine';
 import { PLAYBOOK_CONFIGS } from '@/lib/playbooks';
 import { evaluateGuardrails, getGuardrailTrigger } from '@/lib/guardrails';
+import { errorMessage, isRecord, requiredString } from '@/lib/api-validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,8 +30,10 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { caseId, action } = body; // action: 'APPROVE' | 'REJECT'
-    if (!caseId || !action) {
+    if (!isRecord(body)) throw new Error('A JSON object is required');
+    const caseId = requiredString(body.caseId, 'caseId');
+    const action = requiredString(body.action, 'action').toUpperCase();
+    if (action !== 'APPROVE' && action !== 'REJECT') {
       return NextResponse.json({ error: 'caseId and action (APPROVE|REJECT) required' }, { status: 400 });
     }
 
@@ -90,6 +93,6 @@ export async function POST(req: NextRequest) {
       });
     }
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Failed to update escalation' }, { status: 400 });
+    return NextResponse.json({ error: errorMessage(err, 'Failed to update escalation') }, { status: 400 });
   }
 }

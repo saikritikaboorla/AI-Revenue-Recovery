@@ -6,7 +6,7 @@ export const defaultGuardrails: GuardrailSettings = {
   minConfidenceForAutonomousAction: 60,
   maxInterventionAmountWithoutHumanReview: 100000,
   customerContactDailyLimit: 2,
-  enableVoiceAiForEnterpriseOnly: false,
+  enableAssistedVoiceForEnterpriseOnly: false,
   downtimeAutoSwitchGateway: true,
   b2bDiscountThresholdMaxPct: 10,
 };
@@ -636,8 +636,8 @@ export function generateSeedCases(): RecoveryCase[] {
       currentStep: 'ACTING',
       retryCount: 1,
       maxRetriesAllowed: 3,
-      lastInterventionType: 'AI_VOICE_IVR_AUTHORIZATION',
-      lastInterventionResult: 'AI conversational voice bridge dispatched to CFO authorized contact.',
+      lastInterventionType: 'VOICE_IVR_AUTHORIZATION',
+      lastInterventionResult: 'Simulated voice preview dispatched to CFO authorized contact.',
       decisions: [
         {
           id: 'dec_106',
@@ -646,8 +646,8 @@ export function generateSeedCases(): RecoveryCase[] {
           diagnosis: 'High-value enterprise checkout interrupted by SMS OTP latency. Customer still on workstation.',
           lossProbability: 0.75,
           recoveryConfidence: 0.91,
-          selectedIntervention: 'AI_VOICE_IVR_AUTHORIZATION',
-          rationale: 'VIP customer account requires priority handling. Automated interactive voice bridge initiated for immediate 1-tap re-auth.',
+          selectedIntervention: 'VOICE_IVR_AUTHORIZATION',
+          rationale: 'VIP customer account requires priority handling. Simulated voice authorization preview initiated for immediate re-auth guidance.',
           factors: [
             { factor: 'High LTV VIP Account', impact: 'POSITIVE', weight: 0.50, description: 'LTV ₹24,00,000 Tier-1 Enterprise' },
             { factor: 'Failure Specificity', impact: 'POSITIVE', weight: 0.30, description: 'OTP timeout, no fund deficiency' }
@@ -664,8 +664,8 @@ export function generateSeedCases(): RecoveryCase[] {
         {
           id: 'int_107',
           caseId: 'REC-9026',
-          type: 'AI_VOICE_IVR_AUTHORIZATION',
-          channel: 'Assisted Voice Bridge / Telephony Gateway',
+          type: 'VOICE_IVR_AUTHORIZATION',
+          channel: 'Simulated voice preview / assisted recovery channel',
           initiatedAt: new Date(now.getTime() - 5 * 60 * 1000).toISOString(),
           status: 'PENDING',
           details: { voiceSessionId: 'call_9918a', agentModel: 'RecoverAI Enterprise Voice' },
@@ -688,7 +688,7 @@ export function generateSeedCases(): RecoveryCase[] {
           timestamp: new Date(now.getTime() - 8 * 60 * 1000).toISOString(),
           stage: 'DECIDE',
           actor: 'RECOVER_AI_AUTONOMOUS_AGENT',
-          details: 'High-priority VIP Voice Bridge triggered based on customer tier.',
+          details: 'High-priority simulated voice preview triggered based on customer tier.',
         }
       ]
     }

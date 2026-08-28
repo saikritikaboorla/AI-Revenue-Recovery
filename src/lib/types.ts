@@ -33,7 +33,7 @@ export type InterventionType =
   | 'SWITCH_GATEWAY_RAZORPAYX'
   | 'DYNAMIC_WHATSAPP_CHECKOUT_LINK'
   | 'SMS_FALLBACK_PAYMENT_URL'
-  | 'AI_VOICE_IVR_AUTHORIZATION'
+  | 'VOICE_IVR_AUTHORIZATION'
   | 'MANDATE_BATCH_RESCHEDULE'
   | 'B2B_STRUCTURED_DISCOUNT_PROMISE'
   | 'HUMAN_OPS_ESCALATION';
@@ -150,7 +150,7 @@ export interface GuardrailSettings {
   minConfidenceForAutonomousAction: number;
   maxInterventionAmountWithoutHumanReview: number;
   customerContactDailyLimit: number;
-  enableVoiceAiForEnterpriseOnly: boolean;
+  enableAssistedVoiceForEnterpriseOnly: boolean;
   downtimeAutoSwitchGateway: boolean;
   b2bDiscountThresholdMaxPct: number;
 }
