@@ -28,8 +28,8 @@ export function getGuardrailTrigger(checks: ReturnType<typeof evaluateGuardrails
 }
 
 export function formatRetryStatus(retryCount: number, maxRetries: number): string {
-  const displayedCount = Math.min(Math.max(retryCount, 0), maxRetries);
+  const displayedCount = Math.max(0, retryCount);
   return retryCount >= maxRetries
-    ? `MAX RETRIES REACHED (${displayedCount}/${maxRetries})`
+    ? `MAX RETRIES REACHED (${maxRetries}/${maxRetries})`
     : `${displayedCount}/${maxRetries}`;
 }

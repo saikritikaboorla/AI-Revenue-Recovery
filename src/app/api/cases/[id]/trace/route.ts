@@ -4,6 +4,7 @@ import { PLAYBOOK_CONFIGS } from '@/lib/playbooks';
 import { createAIDecision } from '@/lib/ai-decision';
 import { evaluateGuardrails } from '@/lib/guardrails';
 import { formatRetryStatus } from '@/lib/guardrails';
+import { buildHinglishTranscript } from '@/lib/hinglish-engine';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,7 @@ export async function GET(
   const config = PLAYBOOK_CONFIGS[recCase.playbook];
   const ledgerEntries = db.getLedgerEntriesByCaseId(id);
   const promise = db.getPromiseByCaseId(id);
+  const hinglishTranscript = recCase.playbook === 'HINGLISH_RECOVERY' ? buildHinglishTranscript(recCase) : null;
   const aiDecision = recCase.ai_decision || createAIDecision(recCase, guardrails, db.getCustomerById(recCase.customer_id));
   if (!recCase.ai_decision) {
     recCase.ai_decision = aiDecision;
@@ -86,11 +88,57 @@ export async function GET(
     },
     ledgerEntries,
     promise,
+    hinglishTranscript,
     proof: {
       amountAtRisk: recCase.amount,
       predictedRecoverable: Math.round(recCase.amount * aiDecision.recoveryProbability),
       verifiedRecovered: ledgerEntries.reduce((sum, entry) => sum + entry.recovered_amount, 0),
       verificationSource: ledgerEntries[0]?.verification_source || 'No settlement verified yet',
-    }
+    },
+    finalOutcome: recCase.status === 'RECOVERED'
+      ? 'RECOVERED'
+      : recCase.status === 'ESCALATED'
+        ? 'ESCALATED'
+        : String(recCase.status).startsWith('STOPPED')
+          ? 'STOPPED'
+          : 'NOT_RECOVERED',
+    stageStory: [
+      {
+        stage: 'DETECTED',
+        details: `Issue ${recCase.failure_reason} detected with ₹${recCase.amount.toLocaleString('en-IN')} at risk for ${recCase.customer_name}.`,
+      },
+      {
+        stage: 'DIAGNOSED',
+        details: recCase.diagnosis_summary || aiDecision.diagnosis,
+      },
+      {
+        stage: 'PLAYBOOK_SELECTED',
+        details: `${recCase.playbook} selected${recCase.rationale ? `: ${recCase.rationale}` : ''}.`,
+      },
+      {
+        stage: 'GUARDRAILS',
+        details: guardrailChecks.overallGuardrailPassed
+          ? 'All applicable guardrails passed.'
+          : `Policy stopped autonomous action at ${formatRetryStatus(recCase.retry_count, maxRetries)} or a risk/value threshold.`,
+      },
+      {
+        stage: 'ACTION',
+        details: recCase.last_action
+          ? `${recCase.last_action}${recCase.last_action_result ? ` — ${recCase.last_action_result}` : ''}`
+          : 'No action recorded.',
+      },
+      {
+        stage: 'VERIFY',
+        details: ledgerEntries.length > 0
+          ? `Settlement verified via ${ledgerEntries[0].verification_source} for ₹${ledgerEntries[0].recovered_amount.toLocaleString('en-IN')}.`
+          : 'No settlement verification recorded yet.',
+      },
+      {
+        stage: 'LEDGER',
+        details: ledgerEntries.length > 0
+          ? `Ledger entry ${ledgerEntries[0].id} written at ${ledgerEntries[0].verified_at}.`
+          : 'No ledger entry recorded yet.',
+      },
+    ],
   });
 }

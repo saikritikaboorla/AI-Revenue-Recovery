@@ -127,7 +127,7 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
       id: 'active-cases',
       title: 'Active Cases',
       value: totalCasesCount,
-      subtitle: 'In agent processing pipeline',
+      subtitle: 'In automated processing pipeline',
       icon: Activity,
       valueColor: 'text-cyan-400',
       iconBg: 'bg-cyan-500/10 border-cyan-500/30',

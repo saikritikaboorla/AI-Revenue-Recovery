@@ -44,7 +44,7 @@ const PIPELINE_STEPS = [
   { label: 'Execute Action',  desc: 'WhatsApp link, gateway failover, IVR, or NACH reschedule.' },
   { label: 'Verify',          desc: 'Razorpay webhook confirms successful settlement.' },
   { label: 'Write Ledger',    desc: 'Immutable append-only event written to recovery ledger.' },
-  { label: 'Measure Recovery',desc: 'Win-rate, recovered value and agent attribution updated.' },
+  { label: 'Measure Recovery',desc: 'Win-rate, recovered value and automated attribution updated.' },
 ];
 
 // ── Playbooks ────────────────────────────────────────────────────────────────
@@ -232,7 +232,7 @@ export default function LandingPage() {
           {/* Precision Badge */}
           <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-[11px] sm:text-xs font-semibold tracking-[0.12em] uppercase mb-12 sm:mb-16 shadow-[0_0_25px_rgba(59,130,246,0.18)] backdrop-blur-md">
             <Zap className="h-4 w-4 text-blue-400 shrink-0" />
-            Deterministic Closed-Loop Revenue Recovery Engine
+            AI-Governed Closed-Loop Revenue Recovery Engine
           </div>
 
           {/* Large Bold Hero Headline */}
@@ -250,7 +250,7 @@ export default function LandingPage() {
 
           {/* Supporting Trust Line */}
           <p className="text-sm sm:text-base text-[#93A7C3] font-medium max-w-2xl mx-auto leading-[1.75] tracking-[0.015em] mb-12 sm:mb-14">
-            Every recovery is measured and recorded in an auditable ledger.
+            Every recovery is measured and recorded in an auditable ledger. The runtime decisioning remains deterministic in this build.
           </p>
 
           {/* CTAs with 3D Depth */}
