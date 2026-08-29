@@ -4,7 +4,7 @@
 
 RecoverAI is an AI-assisted revenue-recovery platform. It detects seeded or
 simulated revenue-risk cases, uses a real Google Gemini LLM call to diagnose the
-failure and recommend a recovery playbook, validates the recommendation
+failure and recommend a recovery playbook, validates the recommendation 
 against a fixed playbook set, runs deterministic guardrail checks, executes
 a bounded recovery action, and records verified recovery in a canonical ledger
 with a full audit trail.
