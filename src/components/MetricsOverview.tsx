@@ -224,6 +224,11 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
               <div className="mt-1.5 text-xs text-[#98A2B3] truncate">
                 {card.subtitle}
               </div>
+              {card.id === 'recovered' && (
+                <div className="mt-1 text-[11px] font-medium text-emerald-300/80">
+                  View verified recoveries <span aria-hidden="true">→</span>
+                </div>
+              )}
             </div>
           </button>
         );
