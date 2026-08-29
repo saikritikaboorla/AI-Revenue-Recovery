@@ -175,7 +175,7 @@ export const Navbar: React.FC = () => {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
               </span>
-              <span className="text-[10px] font-mono font-medium whitespace-nowrap">Recovery Engine Live</span>
+              <span className="text-[10px] font-mono font-medium whitespace-nowrap">Recovery Engine · Bounded</span>
             </div>
 
             {/* Launch CTA */}
@@ -230,7 +230,7 @@ export const Navbar: React.FC = () => {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
               </span>
-              <span className="text-[10px] font-mono text-emerald-400">Recovery Engine Live</span>
+              <span className="text-[10px] font-mono text-emerald-400">Recovery Engine · Bounded</span>
             </div>
           </div>
 

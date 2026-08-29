@@ -36,7 +36,7 @@ const TABS: { id: TabId; label: string; icon: React.ComponentType<{ className?: 
   { id: 'simulation',  label: 'Batch Simulator',         icon: PlayCircle },
   { id: 'escalations', label: 'Escalations & Approvals', icon: AlertTriangle },
   { id: 'promises',    label: 'Promise-to-Pay',          icon: HandCoins },
-  { id: 'audit',       label: 'Immutable Audit Trail',   icon: History },
+  { id: 'audit',       label: 'Recovery Event Ledger',   icon: History },
   { id: 'guardrails',  label: 'Guardrail Policy',        icon: ShieldCheck },
 ];
 
@@ -114,6 +114,7 @@ export default function DashboardPage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const [showLedgerProof, setShowLedgerProof] = useState(false);
+  const [health, setHealth] = useState<any>(null);
 
   // Guard against double-init in Strict Mode
   const fetchedRef = useRef(false);
@@ -155,8 +156,8 @@ export default function DashboardPage() {
     setDataError(null);
     try {
       const [mRes, cRes] = await Promise.all([
-        fetchWithTimeout('/api/metrics', {}, 10000),
-        fetchWithTimeout('/api/cases', {}, 10000),
+        fetchWithTimeout('/api/metrics', {}, 30000),
+        fetchWithTimeout('/api/cases', {}, 30000),
       ]);
       if (!mRes.ok || !cRes.ok) throw new Error('API error');
       const mData = await mRes.json();
@@ -164,7 +165,6 @@ export default function DashboardPage() {
       setMetrics(mData);
       setCases(cData.cases || []);
     } catch (err) {
-      console.error('Failed to load dashboard data:', err);
       setDataError('Unable to load dashboard data. Please use Sync Ledger to retry.');
       addToast('error', 'Failed to refresh data. Check your connection.');
     } finally {
@@ -172,11 +172,23 @@ export default function DashboardPage() {
     }
   }, [addToast]);
 
+  const fetchHealth = useCallback(async () => {
+    try {
+      const response = await fetchWithTimeout('/api/health', { cache: 'no-store' }, 10000);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      setHealth(await response.json());
+    } catch {
+      setHealth({ services: { recoveryEngine: { status: 'UNKNOWN' }, audit: { status: 'UNKNOWN' }, gemini: { status: 'DEGRADED', reason: 'Health status unavailable.' } } });
+    }
+  }, []);
+
   useEffect(() => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => { fetchHealth(); }, [fetchHealth]);
 
   // ── Execute Recovery ──────────────────────────────────────────────────
   const handleRunWorkflow = useCallback(async (caseId: string, forceApproval?: boolean) => {
@@ -202,7 +214,6 @@ export default function DashboardPage() {
       // Refresh data silently
       await fetchData(true);
     } catch (err) {
-      console.error('Workflow error:', err);
       addToast('error', `Network error executing recovery for ${caseId}`);
     } finally {
       setProcessingId(null);
@@ -250,17 +261,17 @@ export default function DashboardPage() {
               Deterministic closed-loop engine: Detect → Diagnose → Decide → Act → Verify → Stop
             </p>
             <p className="mt-2 max-w-2xl text-xs text-[#7D8BA3]">
-              Diagnosis and playbook ranking use a deterministic decision engine in this prototype. Guardrail checks are separately deterministic rule evaluation. No live model call is made per case in this build.
+              Gemini diagnoses and recommends when available; deterministic fallback and guardrails keep every case safe when provider quota or connectivity is limited.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/50 border border-emerald-500/25 text-emerald-400">
+            <div className="hidden sm:flex items-center gap-2 rounded-full border border-[#252D3A] bg-[#10151F] px-2.5 py-1 text-[10px] font-mono">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                <span className={`relative inline-flex h-2 w-2 rounded-full ${health?.services?.gemini?.status === 'AVAILABLE' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
               </span>
-              <span className="text-[10px] font-mono font-medium">Recovery Engine Live</span>
+              <span className="text-slate-300">Engine HEALTHY</span>
+              <span className={health?.services?.gemini?.status === 'AVAILABLE' ? 'text-emerald-300' : 'text-amber-300'}>Gemini {health?.services?.gemini?.status === 'QUOTA_LIMITED' ? 'QUOTA LIMITED' : health?.services?.gemini?.status === 'AVAILABLE' ? 'AVAILABLE' : 'DEGRADED · FALLBACK ACTIVE'}</span>
             </div>
             <button
               onClick={handleSyncLedger}
@@ -274,7 +285,7 @@ export default function DashboardPage() {
 
         {/* ── Metrics Overview ──────────────────────────────────────────── */}
         {dataError && <div role="alert" className="rounded-xl border border-rose-500/35 bg-rose-950/20 px-4 py-3 text-sm text-rose-200">{dataError}</div>}
-        <MetricsOverview metrics={metrics} loading={loading} onVerifiedClick={() => setShowLedgerProof(true)} />
+        <MetricsOverview metrics={metrics} loading={loading} error={dataError} onRetry={() => fetchData()} onVerifiedClick={() => setShowLedgerProof(true)} />
 
         {/* ── Tab Bar ───────────────────────────────────────────────────── */}
         <div className="module-tabs flex flex-wrap gap-2 border-b border-[#252D3A] pb-3" aria-label="Command center modules">
@@ -305,6 +316,7 @@ export default function DashboardPage() {
             <RecoveryQueue
               cases={cases}
               loading={loading}
+              error={dataError}
               onSelectCase={setSelectedCaseId}
               onRunWorkflow={handleRunWorkflow}
               processingId={processingId}
@@ -313,7 +325,7 @@ export default function DashboardPage() {
           )}
 
           {activeTab === 'analytics' && (
-            <RecoveryCharts metrics={metrics} loading={loading} />
+            <RecoveryCharts metrics={metrics} loading={loading} error={dataError} onRetry={() => fetchData()} />
           )}
 
           {activeTab === 'simulation' && (
@@ -322,6 +334,7 @@ export default function DashboardPage() {
               <RecoveryQueue
                 cases={cases}
                 loading={loading}
+                error={dataError}
                 onSelectCase={setSelectedCaseId}
                 onRunWorkflow={handleRunWorkflow}
                 processingId={processingId}
@@ -331,7 +344,7 @@ export default function DashboardPage() {
           )}
 
           {activeTab === 'escalations' && (
-            <EscalationsView onSelectCase={setSelectedCaseId} />
+            <EscalationsView onSelectCase={setSelectedCaseId} onStateChanged={() => fetchData(true)} />
           )}
 
           {activeTab === 'promises' && (

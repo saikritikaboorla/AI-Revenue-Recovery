@@ -250,67 +250,55 @@ export class SimulationEngine {
     let totalExecutionMs = 0;
     let executedCaseCount = 0;
 
-    for (const recCase of generatedCases) {
-      totalValueAtRisk += recCase.amount;
-      predictedRecoverableValue += Math.round(recCase.amount * recCase.recovery_confidence / 100);
+    // Network-bound Gemini work is deliberately capped. Four workers give a
+    // useful batch throughput without creating a provider/serverless burst.
+    let nextIndex = 0;
+    const processOne = async (recCase: RecoveryCaseRecord) => {
+      const caseStartMs = performance.now();
+      const res = await RecoveryPipeline.processCase(recCase.id);
+      totalExecutionMs += performance.now() - caseStartMs;
+      executedCaseCount += 1;
 
-      if (config.autonomousAutoExecute !== false) {
-        const caseStartMs = performance.now();
-        const res = await RecoveryPipeline.processCase(recCase.id);
-        totalExecutionMs += performance.now() - caseStartMs;
-        executedCaseCount += 1;
-
-        if (res.recovered) {
-          const recAmt = res.case.recovered_amount || recCase.amount;
-          totalValueRecovered += recAmt;
-          recoveredCount      += 1;
-        } else if (res.escalated) {
-          escalatedCount += 1;
-        } else if (res.case.status === 'STOPPED_UNRECOVERABLE') {
-          failedCount += 1;
-        }
-        if (res.stopped && !res.recovered && !res.escalated) stoppedCount += 1;
-        const decision = res.case.ai_decision;
-        if (decision) {
-          decisionDistribution[decision.selectedPlaybook] = (decisionDistribution[decision.selectedPlaybook] || 0) + 1;
-          decision.decisionFactors.forEach(factor => {
-            if (factor.signal === 'POSITIVE') decisionFactors[factor.factor] = (decisionFactors[factor.factor] || 0) + 1;
-          });
-          // Track AI-assisted vs deterministic fallback
-          if (decision.source === 'GEMINI_AI' && !decision.aiFallbackUsed) {
-            aiAssistedCount += 1;
-          } else {
-            fallbackCount += 1;
-          }
-        } else {
-          fallbackCount += 1;
-        }
-
-        caseResults.push({
-          id:            res.case.id,
-          customerName:  res.case.customer_name,
-          amount:        res.case.amount,
-          playbook:      res.case.playbook,
-          status:        res.case.status,
-          recovered:     res.recovered,
-          escalated:     res.escalated,
-          recoveredAmount: res.case.recovered_amount || 0,
-          predictedRecoverable: Math.round(recCase.amount * recCase.recovery_confidence / 100),
-        });
-      } else {
-        caseResults.push({
-          id:           recCase.id,
-          customerName: recCase.customer_name,
-          amount:       recCase.amount,
-          playbook:     recCase.playbook,
-          status:       recCase.status,
-          recovered:    false,
-          escalated:    false,
-          recoveredAmount: 0,
-          predictedRecoverable: Math.round(recCase.amount * recCase.recovery_confidence / 100),
-        });
+      if (res.recovered) {
+        totalValueRecovered += res.case.recovered_amount || recCase.amount;
+        recoveredCount += 1;
+      } else if (res.escalated) {
+        escalatedCount += 1;
+      } else if (res.case.status === 'STOPPED_UNRECOVERABLE' || res.case.status === 'STOPPED_MAX_RETRIES') {
+        stoppedCount += 1;
       }
-    }
+      if (res.stopped && !res.recovered && !res.escalated && !res.case.status.startsWith('STOPPED')) stoppedCount += 1;
+      const decision = res.case.ai_decision;
+      if (decision) {
+        decisionDistribution[decision.selectedPlaybook] = (decisionDistribution[decision.selectedPlaybook] || 0) + 1;
+        decision.decisionFactors.forEach(factor => {
+          if (factor.signal === 'POSITIVE') decisionFactors[factor.factor] = (decisionFactors[factor.factor] || 0) + 1;
+        });
+        if (decision.source === 'GEMINI_AI' && !decision.aiFallbackUsed) aiAssistedCount += 1;
+        else fallbackCount += 1;
+      } else {
+        fallbackCount += 1;
+      }
+      caseResults.push({
+        id: res.case.id, customerName: res.case.customer_name, amount: res.case.amount,
+        playbook: res.case.playbook, status: res.case.status, recovered: res.recovered,
+        escalated: res.escalated, recoveredAmount: res.case.recovered_amount || 0,
+        predictedRecoverable: Math.round(recCase.amount * recCase.recovery_confidence / 100),
+      });
+    };
+
+    const runWorker = async () => {
+      while (true) {
+        const index = nextIndex++;
+        if (index >= generatedCases.length) return;
+        const recCase = generatedCases[index];
+        totalValueAtRisk += recCase.amount;
+        predictedRecoverableValue += Math.round(recCase.amount * recCase.recovery_confidence / 100);
+        if (config.autonomousAutoExecute !== false) await processOne(recCase);
+        else caseResults.push({ id: recCase.id, customerName: recCase.customer_name, amount: recCase.amount, playbook: recCase.playbook, status: recCase.status, recovered: false, escalated: false, recoveredAmount: 0, predictedRecoverable: Math.round(recCase.amount * recCase.recovery_confidence / 100) });
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, generatedCases.length) }, runWorker));
 
     const recoveryRatePct = totalValueAtRisk > 0
       ? Number(((totalValueRecovered / totalValueAtRisk) * 100).toFixed(1))

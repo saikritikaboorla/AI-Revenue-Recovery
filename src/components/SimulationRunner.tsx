@@ -168,7 +168,6 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
         }, 300);
       }
     } catch (err) {
-      console.error('Simulation failed:', err);
       clearProgressInterval();
       setProgress(0);
       setProgressMessage('Simulation failed. Please retry.');
@@ -191,7 +190,6 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
       onResetState?.();
       setResetMessage('Demo state reset: overview, analytics, escalations, promises, audit, and queue now reflect the seed state.');
     } catch (err) {
-      console.error('Reset failed:', err);
       setErrorMessage('Unable to reset demo state. Please retry; no local result state was cleared.');
     }
   };
@@ -466,7 +464,7 @@ export const SimulationRunner: React.FC<SimulationRunnerProps> = ({ onSimulation
               <p className="text-base font-bold text-rose-300">{stopped} cases</p>
             </div>
             <div className="rounded-lg bg-[#10151F] border border-rose-900/30 p-3 space-y-0.5">
-              <span className="text-[10px] uppercase tracking-wider text-[#98A2B3]">Failed / unrecoverable</span>
+              <span className="text-[10px] uppercase tracking-wider text-[#98A2B3]">Technical failures</span>
               <p className="text-base font-bold text-rose-300">{failed} cases</p>
             </div>
             {(lastResult.aiAssistedCount !== undefined || lastResult.fallbackCount !== undefined) && (

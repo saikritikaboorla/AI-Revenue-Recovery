@@ -128,6 +128,8 @@ export class DatabaseService {
   private guardrails: GuardrailPolicy = { ...DEFAULT_GUARDRAILS };
   private isLoaded: boolean = false;
   private durableStateLoad: Promise<void> | null = null;
+  private durableStateFlush: Promise<void> = Promise.resolve();
+  private settlementsReconciled = false;
 
   private constructor() {
     if (!this.loadRuntimeState()) {
@@ -143,10 +145,15 @@ export class DatabaseService {
   }
 
   private persistRuntimeState(): void {
+    // Vercel's filesystem is read-only. Durable production state is written
+    // through Blob; attempting the local snapshot there only creates noisy
+    // warnings and adds latency to every mutation.
+    if (process.env.BLOB_READ_WRITE_TOKEN) return;
     try {
       const dir = path.dirname(RUNTIME_STATE_FILE);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(RUNTIME_STATE_FILE, JSON.stringify({
+      const tempFile = `${RUNTIME_STATE_FILE}.${process.pid}.tmp`;
+      fs.writeFileSync(tempFile, JSON.stringify({
         guardrails: this.guardrails,
         customers: Array.from(this.customers.values()),
         cases: Array.from(this.cases.values()),
@@ -155,6 +162,8 @@ export class DatabaseService {
         escalations: Array.from(this.escalations.values()),
         promises: Array.from(this.promises.values()),
       }));
+      // Keep readers from ever observing a partially-written JSON snapshot.
+      fs.renameSync(tempFile, RUNTIME_STATE_FILE);
     } catch (err) {
       console.warn('Runtime state persistence notice:', err);
     }
@@ -214,6 +223,10 @@ export class DatabaseService {
     if (this.durableStateLoad) return this.durableStateLoad;
     this.durableStateLoad = (async () => {
       try {
+        // Hydration is a read-only snapshot. Let Vercel Blob serve the shared
+        // document through its CDN so cold operational pages do not wait on a
+        // slow origin read; flushDurableState still reads origin content when
+        // merging mutations before every write.
         const blob = await getBlob(DURABLE_STATE_BLOB, { access: 'private', useCache: false });
         if (blob) {
           const parsed = JSON.parse(await new Response(blob.stream).text()) as Partial<{
@@ -241,16 +254,22 @@ export class DatabaseService {
   /** Flush the canonical repository after a request mutates it. */
   public async flushDurableState(replace = false): Promise<void> {
     if (!process.env.BLOB_READ_WRITE_TOKEN) return;
-    // Merge with the latest shared document so a warm serverless instance
-    // cannot overwrite cases created by another instance from a stale map.
-    const existing = await getBlob(DURABLE_STATE_BLOB, { access: 'private', useCache: false });
-    if (existing && !replace) {
-      const parsed = JSON.parse(await new Response(existing.stream).text()) as Parameters<DatabaseService['applyParsedState']>[0];
-      this.applyParsedState(parsed);
-    }
-    await putBlob(DURABLE_STATE_BLOB, this.serializeState(), {
-      access: 'private', allowOverwrite: true, contentType: 'application/json',
+    // Serialize writes within a warm runtime. Without this, two actions can
+    // read the same snapshot and the slower write can erase the faster one.
+    this.durableStateFlush = this.durableStateFlush.catch(() => undefined).then(async () => {
+      // Merge with the latest shared document so a warm serverless instance
+      // cannot overwrite cases created by another instance from a stale map.
+      const existing = await getBlob(DURABLE_STATE_BLOB, { access: 'private', useCache: false });
+      if (existing && !replace) {
+        const parsed = JSON.parse(await new Response(existing.stream).text()) as Parameters<DatabaseService['applyParsedState']>[0];
+        this.applyParsedState(parsed);
+      }
+      await putBlob(DURABLE_STATE_BLOB, this.serializeState(), {
+        access: 'private', allowOverwrite: true, contentType: 'application/json',
+        cacheControlMaxAge: 60,
+      });
     });
+    await this.durableStateFlush;
   }
 
   private loadRuntimeState(): boolean {
@@ -623,6 +642,9 @@ export class DatabaseService {
       recoveryRate: stat.atRisk > 0 ? Number(((stat.recovered / stat.atRisk) * 100).toFixed(1)) : 0
     }));
 
+    const pendingEscalationsCount = Array.from(this.escalations.values()).filter(item => item.status === 'PENDING').length;
+    const auditEventsCount = this.audits.length;
+
     return {
       totalRevenueAtRisk,
       totalRevenueRecovered,
@@ -631,8 +653,10 @@ export class DatabaseService {
       activeWorkflowsCount,
       resolvedCasesCount,
       escalatedCasesCount,
+      pendingEscalationsCount,
       totalCasesCount: allCases.length,
       ledgerEntriesCount: ledgerEntries.length,
+      auditEventsCount,
       playbookMetrics,
       recentRecoveries: ledgerEntries.slice(-6).reverse()
     };
@@ -671,11 +695,15 @@ export class DatabaseService {
 
   public getAllAudits(): AuditRecord[] {
     this.ensureRecoveredSettlements();
-    return this.audits.slice(-100).reverse();
+    return this.audits.slice().reverse();
   }
 
   public getEscalations(): EscalationRecord[] {
     return Array.from(this.escalations.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
+  public getEscalationByCaseId(caseId: string): EscalationRecord | undefined {
+    return Array.from(this.escalations.values()).find(item => item.case_id === caseId);
   }
 
   public getPromises(): PromiseRecord[] {
@@ -808,6 +836,11 @@ export class DatabaseService {
   }
 
   private ensureRecoveredSettlements(): void {
+    if (this.settlementsReconciled) return;
+    // Reconciliation is a state-load invariant, not work that read APIs
+    // should repeat. Re-running settleCase here used to serialize the full
+    // runtime document once per recovered case during every audit read.
+    this.settlementsReconciled = true;
     for (const recCase of this.cases.values()) {
       const existing = this.getRawLedgerEntriesByCaseId(recCase.id).find(entry => entry.recovered_amount > 0);
       if (recCase.status !== 'RECOVERED' && !existing && recCase.recovered_amount <= 0) continue;
@@ -879,6 +912,7 @@ export class DatabaseService {
     this.escalations.clear();
     this.promises.clear();
     this.guardrails = { ...DEFAULT_GUARDRAILS };
+    this.settlementsReconciled = false;
     this.seedFromCSV();
     try {
       if (fs.existsSync(RUNTIME_STATE_FILE)) fs.unlinkSync(RUNTIME_STATE_FILE);

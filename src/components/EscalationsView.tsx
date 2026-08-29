@@ -6,24 +6,26 @@ import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 
 interface EscalationsViewProps {
   onSelectCase: (caseId: string) => void;
+  onStateChanged?: () => Promise<void> | void;
 }
 
-export const EscalationsView: React.FC<EscalationsViewProps> = ({ onSelectCase }) => {
+export const EscalationsView: React.FC<EscalationsViewProps> = ({ onSelectCase, onStateChanged }) => {
   const [escalations, setEscalations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   const fetchEscalations = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchWithTimeout('/api/escalations', {}, 10000);
+      const res = await fetchWithTimeout('/api/escalations', {}, 30000);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setEscalations(data.escalations || []);
     } catch (err) {
-      console.error('Failed to load escalations:', err);
       setError('Unable to load escalation records. Please refresh or retry.');
     } finally {
       setLoading(false);
@@ -35,16 +37,25 @@ export const EscalationsView: React.FC<EscalationsViewProps> = ({ onSelectCase }
   }, []);
 
   const handleDecision = async (caseId: string, action: 'APPROVE' | 'REJECT') => {
+    if (actionLoading) return;
     setActionLoading(caseId + action);
+    setActionError(null);
+    setActionSuccess(null);
     try {
-      await fetchWithTimeout('/api/escalations', {
+      const response = await fetchWithTimeout('/api/escalations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ caseId, action })
-      }, 15000);
+      }, 60000);
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
       await fetchEscalations();
+      await onStateChanged?.();
+      setActionSuccess(`${action === 'APPROVE' ? 'Approval' : 'Rejection'} confirmed for ${caseId}.`);
     } catch (err) {
-      console.error('Decision error:', err);
+      setActionError(err instanceof Error ? err.message : 'Unable to update escalation.');
     } finally {
       setActionLoading(null);
     }
@@ -73,6 +84,9 @@ export const EscalationsView: React.FC<EscalationsViewProps> = ({ onSelectCase }
           {pendingList.length} Pending Approval
         </span>
       </div>
+
+      {actionError && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/20 px-3 py-2 text-xs text-rose-300">{actionError}</div>}
+      {actionSuccess && <div role="status" className="rounded-lg border border-emerald-500/30 bg-emerald-950/20 px-3 py-2 text-xs text-emerald-300">{actionSuccess}</div>}
 
       {loading ? (
         <div className="py-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
@@ -118,17 +132,17 @@ export const EscalationsView: React.FC<EscalationsViewProps> = ({ onSelectCase }
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleDecision(e.case_id, 'REJECT')}
-                    disabled={actionLoading === e.case_id + 'REJECT'}
+                    disabled={Boolean(actionLoading)}
                     className="px-3 py-1.5 rounded-lg border border-rose-500/40 bg-rose-950/40 text-rose-300 text-xs font-bold hover:bg-rose-900/60 transition-all flex items-center gap-1 cursor-pointer"
                   >
-                    <X className="h-3 w-3" /> Reject
+                    {actionLoading === e.case_id + 'REJECT' ? <RefreshCw className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />} {actionLoading === e.case_id + 'REJECT' ? 'Processing…' : 'Reject'}
                   </button>
                   <button
                     onClick={() => handleDecision(e.case_id, 'APPROVE')}
-                    disabled={actionLoading === e.case_id + 'APPROVE'}
+                    disabled={Boolean(actionLoading)}
                     className="px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-950/40 text-emerald-300 text-xs font-bold hover:bg-emerald-900/60 transition-all flex items-center gap-1 cursor-pointer"
                   >
-                    <Check className="h-3 w-3" /> Approve
+                    {actionLoading === e.case_id + 'APPROVE' ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />} {actionLoading === e.case_id + 'APPROVE' ? 'Processing…' : 'Approve'}
                   </button>
                 </div>
               </div>

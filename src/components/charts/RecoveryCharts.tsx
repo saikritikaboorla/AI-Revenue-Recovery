@@ -22,6 +22,8 @@ import { BarChart3, TrendingUp, AlertTriangle, CheckCircle2, Clock, Activity, Br
 interface RecoveryChartsProps {
   metrics: any;
   loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
 const PLAYBOOK_COLORS: Record<string, string> = {
@@ -105,7 +107,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-export const RecoveryCharts: React.FC<RecoveryChartsProps> = ({ metrics, loading = false }) => {
+export const RecoveryCharts: React.FC<RecoveryChartsProps> = ({ metrics, loading = false, error, onRetry }) => {
 
   // ── Loading state ──────────────────────────────────────────────────────
   if (loading) {
@@ -126,6 +128,10 @@ export const RecoveryCharts: React.FC<RecoveryChartsProps> = ({ metrics, loading
   }
 
   // ── No data state ──────────────────────────────────────────────────────
+  if (error) {
+    return <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-950/15 p-12 text-center text-sm text-rose-200">{error}{onRetry && <button onClick={onRetry} className="ml-3 rounded-lg border border-rose-400/40 px-3 py-1.5 text-xs font-semibold">Retry</button>}</div>;
+  }
+
   if (!metrics) {
     return (
       <div className="rounded-xl border border-[#252D3A] bg-[#141A24] p-12 flex flex-col items-center gap-4 text-center">

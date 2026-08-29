@@ -44,6 +44,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Case ${caseId} not found` }, { status: 404 });
     }
 
+    const escalation = db.getEscalationByCaseId(caseId);
+    if (!escalation) {
+      return NextResponse.json({ error: `No escalation record exists for case ${caseId}` }, { status: 409 });
+    }
+    if (escalation.status !== 'PENDING') {
+      return NextResponse.json({
+        success: true,
+        idempotent: true,
+        caseId,
+        action: escalation.status,
+        escalation,
+        case: recCase,
+      });
+    }
+
     if (action === 'APPROVE') {
       db.resolveEscalation(caseId, 'APPROVED');
       recCase.requires_human_approval = false;
@@ -76,6 +91,8 @@ export async function POST(req: NextRequest) {
       db.resolveEscalation(caseId, 'REJECTED');
       recCase.status = 'STOPPED_UNRECOVERABLE';
       recCase.current_step = 'STOPPED_HUMAN_REJECTED';
+      recCase.requires_human_approval = false;
+      recCase.escalation_reason = recCase.escalation_reason || 'Recovery action rejected by human approver; workflow stopped.';
       db.saveCase(recCase);
 
       db.addAudit({

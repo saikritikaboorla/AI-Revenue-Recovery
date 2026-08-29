@@ -23,6 +23,7 @@ import {
 interface RecoveryQueueProps {
   cases: any[];
   loading: boolean;
+  error?: string | null;
   onSelectCase: (id: string) => void;
   onRunWorkflow: (id: string) => void;
   processingId: string | null;
@@ -201,6 +202,7 @@ function isTerminal(status: string) {
 export const RecoveryQueue: React.FC<RecoveryQueueProps> = ({
   cases = [],
   loading,
+  error,
   onSelectCase,
   onRunWorkflow,
   processingId,
@@ -353,8 +355,11 @@ export const RecoveryQueue: React.FC<RecoveryQueueProps> = ({
             {/* Loading skeleton */}
             {loading && <SkeletonRows />}
 
+            {/* Request failure */}
+            {!loading && error && <tr><td colSpan={7} className="p-10 text-center text-sm text-rose-300">{error}<button onClick={onRefresh} className="ml-3 rounded-lg border border-rose-400/40 px-3 py-1.5 text-xs font-semibold">Retry</button></td></tr>}
+
             {/* Empty state */}
-            {!loading && filteredCases.length === 0 && (
+            {!loading && !error && filteredCases.length === 0 && (
               <tr>
                 <td colSpan={7}>
                   <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">

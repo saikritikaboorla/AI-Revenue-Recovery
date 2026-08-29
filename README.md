@@ -10,11 +10,11 @@ a bounded recovery action, and records verified recovery in a canonical ledger
 with a full audit trail.
 
 > **Architecture disclosure:** Case diagnosis and playbook recommendation use a
-> real server-side call to the Gemini API (Google). Guardrail evaluation,
+> real server-side call to the Gemini API (Google) when quota is available. Guardrail evaluation,
 > execution authorization, settlement verification, and ledger writes are
 > fully deterministic and cannot be influenced by the model. If the model
 > call fails or returns invalid output the system falls back to the
-> deterministic decision engine and continues operating without interruption.
+> deterministic decision engine and continues operating with a clearly labelled safety fallback.
 > The default Razorpay adapter is a mock and does not move real money.
 
 ## Architecture
@@ -76,7 +76,7 @@ validates the recommendation and enforces guardrails.
 ### Provider and model
 
 - **Provider:** Google Gemini
-- **Model:** `gemini-3.6-flash`
+- **Model:** `GEMINI_MODEL` (default `gemini-3.6-flash`)
 - **Call location:** `src/lib/ai-gemini.ts` — `getAIDecision()` function
 
 ### What the model receives
@@ -131,6 +131,15 @@ decision engine. The fallback is recorded in:
 - `AIDecisionRecord.aiFallbackReason: "<reason>"`
 - The Case Trace "AI Decision Evidence" section shows "Decision source: Deterministic fallback"
 - The audit record uses `action: 'DECISION_FALLBACK'`
+
+Transient transport, quota/rate-limit, and provider failures receive at most
+three attempts with 250 ms and 750 ms exponential backoff. Permanent failures
+such as an invalid key, invalid model, or invalid structured response are not
+retried indefinitely; the sanitized provider cause is retained in the trace.
+Batch simulation uses four concurrent pipeline workers. AI-assisted and
+deterministic-fallback counts are derived from the persisted decision source.
+The Gemini SDK request uses `models.generateContent` against the Google AI
+`v1beta` API; server logs contain only redacted model/status diagnostics.
 
 ### Case Trace — AI Decision Evidence section
 
@@ -250,7 +259,11 @@ The repository ignores `.env*`. Never commit real credentials.
 - Hinglish is a simulated transcript/preview, not telephony.
 - There is no authentication, authorization model, or role-based access control.
 - INR is the assumed display and ledger currency.
-- Guardrail settings persist only for the current server process.
+- Guardrail settings persist through the shared production runtime document when
+  Blob is configured; without it they are process-local.
+- Gemini availability is an external dependency. When the configured project is
+  quota-limited, the UI reports degraded/quota-limited health and each affected
+  decision remains deterministic fallback with its sanitized technical reason.
 
 ## Problem-statement alignment
 

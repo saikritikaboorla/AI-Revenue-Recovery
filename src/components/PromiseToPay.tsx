@@ -35,7 +35,6 @@ export const PromiseToPay: React.FC<PromiseToPayProps> = ({ onSelectCase }) => {
       const data = await res.json();
       setPromises(data.promises || []);
     } catch (err) {
-      console.error('Failed to load promises:', err);
       setError('Unable to load promise-to-pay records. Use Refresh to retry.');
     } finally {
       setLoading(false);
@@ -61,7 +60,6 @@ export const PromiseToPay: React.FC<PromiseToPayProps> = ({ onSelectCase }) => {
       }
       await fetchPromises();
     } catch (err) {
-      console.error('Promise action error:', err);
       setActionError(err instanceof Error ? err.message : 'Unable to update promise-to-pay record.');
     } finally {
       setActionLoading(null);

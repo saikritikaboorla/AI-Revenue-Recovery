@@ -15,6 +15,8 @@ import {
 interface MetricsOverviewProps {
   metrics: any;
   loading: boolean;
+  error?: string | null;
+  onRetry?: () => void;
   onVerifiedClick?: () => void;
 }
 
@@ -37,9 +39,9 @@ const SkeletonCard: React.FC = () => (
 );
 
 /* ─── Main component ─── */
-export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loading, onVerifiedClick }) => {
+export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loading, error, onRetry, onVerifiedClick }) => {
   /* ── Loading state: 7 shimmer cards ── */
-  if (loading || !metrics) {
+  if (loading) {
     return (
       <>
         <style>{`
@@ -56,6 +58,14 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
     );
   }
 
+  if (error) {
+    return <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-950/15 p-6 text-sm text-rose-200">{error}{onRetry && <button onClick={onRetry} className="ml-3 rounded-lg border border-rose-400/40 px-3 py-1.5 text-xs font-semibold">Retry</button>}</div>;
+  }
+
+  if (!metrics) {
+    return <div className="rounded-xl border border-[#252D3A] bg-[#141A24] p-6 text-sm text-[#98A2B3]">No overview data is available yet.</div>;
+  }
+
   /* ── Derived values ── */
   const totalRevenueAtRisk      = Number(metrics.totalRevenueAtRisk      ?? 0);
   const totalRecoverableRevenue = Number(metrics.totalRecoverableRevenue  ?? 0);
@@ -63,6 +73,7 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
   const overallRecoveryRate     = Number(metrics.overallRecoveryRate      ?? 0);
   const totalCasesCount         = Number(metrics.totalCasesCount          ?? 0);
   const escalatedCasesCount     = Number(metrics.escalatedCasesCount      ?? 0);
+  const pendingEscalationsCount = Number(metrics.pendingEscalationsCount ?? escalatedCasesCount);
   const ledgerEntriesCount      = Number(metrics.ledgerEntriesCount       ?? 0);
 
   /* ── Card definitions ── */
@@ -139,7 +150,7 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
     {
       id: 'escalations',
       title: 'Escalations',
-      value: escalatedCasesCount,
+      value: pendingEscalationsCount,
       subtitle: 'Pending human review',
       icon: ShieldAlert,
       valueColor: 'text-purple-300',
@@ -153,7 +164,7 @@ export const MetricsOverview: React.FC<MetricsOverviewProps> = ({ metrics, loadi
       id: 'ledger',
       title: 'Ledger Entries',
       value: ledgerEntriesCount,
-      subtitle: 'Immutable audit records',
+      subtitle: 'Verified ledger entries',
       icon: BookOpen,
       valueColor: 'text-indigo-400',
       iconBg: 'bg-indigo-500/10 border-indigo-500/30',

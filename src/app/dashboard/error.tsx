@@ -12,7 +12,7 @@ export default function ErrorBoundary({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('Captured runtime error:', error);
+    void error;
   }, [error]);
 
   return (

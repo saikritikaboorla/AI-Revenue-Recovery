@@ -4,7 +4,7 @@ import GradientWaves from "@/components/effects/GradientWaves";
 
 export const metadata: Metadata = {
   title: "RecoverAI — Deterministic Revenue Recovery Platform",
-  description: "RecoverAI is a bounded recovery prototype that detects revenue at risk, executes deterministic interventions, and verifies recovered funds with auditable ledger proof. No live model call is made per case in this build.",
+  description: "RecoverAI is a bounded recovery prototype that uses server-side Gemini diagnosis, deterministic interventions, and auditable settlement-backed ledger proof.",
   metadataBase: new URL("https://ai-revenue-recovery-flame.vercel.app"),
   openGraph: {
     title: "RecoverAI — Deterministic Revenue Recovery",

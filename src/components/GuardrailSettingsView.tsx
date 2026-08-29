@@ -16,6 +16,7 @@ import {
   Users,
 } from 'lucide-react';
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
+import { PLAYBOOK_CONFIGS } from '@/lib/playbooks';
 
 interface GuardrailPolicy {
   maxRetries: number;
@@ -174,21 +175,24 @@ export const GuardrailSettingsView: React.FC = () => {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadSettings = async () => {
     setLoading(true);
-    fetchWithTimeout('/api/guardrails', {}, 10000)
-      .then((res) => res.json())
-      .then((data: Partial<GuardrailPolicy>) => {
-        // Merge with defaults so we never have undefined values
-        setSettings({ ...DEFAULTS, ...data });
-      })
-      .catch((err) => {
-        console.error('Failed to load guardrails:', err);
-        setSettings({ ...DEFAULTS });
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    setLoadError(null);
+    try {
+      const response = await fetchWithTimeout('/api/guardrails', {}, 10000);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      setSettings({ ...DEFAULTS, ...data });
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Unable to load guardrails.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadSettings(); }, []);
 
   const handleChange = <K extends keyof GuardrailPolicy>(
     key: K,
@@ -217,7 +221,6 @@ export const GuardrailSettingsView: React.FC = () => {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err: any) {
-      console.error('Failed to save guardrails:', err);
       setSaveError(err.message || 'Failed to save. Please try again.');
     } finally {
       setSaving(false);
@@ -284,6 +287,8 @@ export const GuardrailSettingsView: React.FC = () => {
               <SkeletonCard key={i} />
             ))}
           </div>
+        ) : loadError ? (
+          <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-950/15 p-8 text-center text-sm text-rose-200">{loadError}<button onClick={loadSettings} className="ml-3 rounded-lg border border-rose-400/40 px-3 py-1.5 text-xs font-semibold">Retry</button></div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {RULE_CARDS.map((rule) => {
@@ -356,6 +361,22 @@ export const GuardrailSettingsView: React.FC = () => {
       </div>
 
       {/* Informational Guardrail Logic Cards */}
+      {!loading && !loadError && settings && (
+        <div className="rounded-xl border border-cyan-500/20 bg-cyan-950/10 p-5 space-y-4">
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-widest text-cyan-200">Merchant control surface</h4>
+            <p className="mt-1 text-xs text-slate-400">The merchant defines the boundaries. AI recommends; policy validates; the execution layer acts.</p>
+          </div>
+          <div className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+            <div><span className="text-slate-500">Automation mode</span><p className="mt-1 font-semibold text-white">Autonomous within policy · human review on triggers</p></div>
+            <div><span className="text-slate-500">Human approval triggers</span><p className="mt-1 font-semibold text-white">Risk &gt; {settings.maxRiskScoreForAutonomousAction} · amount &gt; ₹{settings.highValueThreshold.toLocaleString('en-IN')} · retry limit</p></div>
+            <div><span className="text-slate-500">Maximum autonomous exposure</span><p className="mt-1 font-semibold text-white">₹{settings.highValueThreshold.toLocaleString('en-IN')} per case</p></div>
+            <div><span className="text-slate-500">Communication policy</span><p className="mt-1 font-semibold text-white">{settings.dailyContactLimit} contacts/day · {settings.cooldownHours}h cooldown · simulated channels only</p></div>
+          </div>
+          <div><span className="text-xs text-slate-500">Allowed bounded recovery playbooks</span><div className="mt-2 flex flex-wrap gap-2">{Object.values(PLAYBOOK_CONFIGS).map(playbook => <span key={playbook.type} className="rounded-full border border-cyan-400/20 bg-cyan-400/5 px-2.5 py-1 text-[11px] text-cyan-100">{playbook.displayName}</span>)}</div></div>
+        </div>
+      )}
+
       <div>
         <h4 className="text-xs font-semibold uppercase tracking-widest text-[#98A2B3] mb-4 flex items-center gap-2">
           <Info className="h-3.5 w-3.5 text-blue-400" />

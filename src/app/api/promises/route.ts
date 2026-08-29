@@ -106,6 +106,8 @@ export async function POST(req: NextRequest) {
       }
 
       case 'MARK_BROKEN': {
+        const existingPromise = db.getPromiseByCaseId(safeCaseId);
+        const wasAlreadyBroken = existingPromise?.status === 'BROKEN';
         db.updatePromiseStatus(safeCaseId, 'BROKEN');
         if (recCase.status !== 'ESCALATED') {
           recCase.status = 'ESCALATED';
@@ -127,15 +129,17 @@ export async function POST(req: NextRequest) {
             created_at: new Date().toISOString(),
           });
 
+        }
+        if (!wasAlreadyBroken) {
           db.addAudit({
-            id: `aud_ptp_broken_${Date.now()}`,
+            id: `aud_ptp_broken_${safeCaseId}_${Date.now()}`,
             case_id: safeCaseId,
             timestamp: new Date().toISOString(),
             stage: 'STOP_OR_ESCALATE',
             actor: 'GUARDRAIL_COMPLIANCE_MONITOR',
             action: 'PROMISE_BREACHED_ESCALATED',
             result: 'ESCALATED',
-            details: `Customer breached payment promise. Case escalated to Commercial Collections Specialist.`
+            details: `Customer breached payment promise. ${recCase.status === 'ESCALATED' ? 'Existing escalation remains pending for human review.' : 'Case escalated to Commercial Collections Specialist.'}`
           });
         }
         await db.flushDurableState();

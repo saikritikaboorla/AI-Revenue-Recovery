@@ -43,7 +43,7 @@ const PIPELINE_STEPS = [
   { label: 'Guardrail Check', desc: 'Max-retry, cooldown, contact-cap and value-threshold gates.' },
   { label: 'Execute Action',  desc: 'WhatsApp link, gateway failover, IVR, or NACH reschedule.' },
   { label: 'Verify',          desc: 'Razorpay webhook confirms successful settlement.' },
-  { label: 'Write Ledger',    desc: 'Immutable append-only event written to recovery ledger.' },
+  { label: 'Write Ledger',    desc: 'Append-only event written to the recovery ledger.' },
   { label: 'Measure Recovery',desc: 'Win-rate, recovered value and automated attribution updated.' },
 ];
 
@@ -202,7 +202,7 @@ export default function LandingPage() {
       value: metrics
         ? String(metrics.totalCasesCount ?? 0)
         : null,
-      sub:   'Immutable audit trail',
+      sub:   'Append-only recovery event ledger',
       valueColor: 'text-cyan-400',
       borderGlow: 'border-cyan-500/30 shadow-[0_0_18px_rgba(34,211,238,0.1)]',
       Icon: Users,

@@ -117,16 +117,21 @@ export const AuditTrailView: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ limit: '300' });
+      const params = new URLSearchParams({ limit: '10000' });
       if (stageFilter !== 'ALL') params.set('stage', stageFilter);
 
-      const res = await fetchWithTimeout(`/api/audit?${params.toString()}`, {}, 10000);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // The first cold read may hydrate the shared durable snapshot; keep the
+      // UI in LOADING until that canonical response arrives rather than
+      // incorrectly showing an empty audit trail.
+      const res = await fetchWithTimeout(`/api/audit?${params.toString()}`, {}, 90000);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
       const data = await res.json();
       setEvents(data.audits || []);
       setTotal(data.total ?? (data.audits?.length ?? 0));
     } catch (err) {
-      console.error('Failed to load audit events:', err);
       setError('Could not fetch audit data. Please try refreshing.');
     } finally {
       setLoading(false);
@@ -173,12 +178,12 @@ export const AuditTrailView: React.FC = () => {
               <History className="h-5 w-5" />
             </div>
             <h3 className="text-base font-bold text-[#F5F7FA]">
-              Immutable FinTech Audit Trail &amp; Event Ledger
+              Append-only recovery event ledger
             </h3>
           </div>
           <p className="text-xs text-[#98A2B3] mt-1 max-w-xl">
             Every autonomous detection, diagnosis, decision, intervention, and webhook verification
-            recorded in sequence. Cryptographically ordered and tamper-evident.
+            Recorded in chronological order from the shared recovery state.
           </p>
         </div>
 

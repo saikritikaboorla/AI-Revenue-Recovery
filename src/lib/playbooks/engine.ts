@@ -4,7 +4,7 @@ import { createAIDecision } from '../ai-decision';
 import { getAIDecision } from '../ai-gemini';
 import { formatRetryStatus } from '../guardrails';
 
-const MODEL_LABEL = 'gemini-3.6-flash';
+const MODEL_LABEL = process.env.GEMINI_MODEL?.trim() || 'gemini-3.6-flash';
 
 export interface ExecutionResult {
   success: boolean;
@@ -17,11 +17,24 @@ export interface ExecutionResult {
 }
 
 export class RecoveryPipeline {
+  private static inFlight = new Map<string, Promise<ExecutionResult>>();
+
+  public static processCase(caseId: string, options?: { forceApproval?: boolean }): Promise<ExecutionResult> {
+    const existing = this.inFlight.get(caseId);
+    if (existing) return existing;
+    const run = this.processCaseInternal(caseId, options);
+    this.inFlight.set(caseId, run);
+    void run.finally(() => {
+      if (this.inFlight.get(caseId) === run) this.inFlight.delete(caseId);
+    });
+    return run;
+  }
+
   /**
    * Executes full end-to-end recovery pipeline for a specific case:
    * EVENT -> DETECT -> DIAGNOSE -> RISK SCORE -> DECIDE PLAYBOOK -> CHECK GUARDRAILS -> EXECUTE ACTION -> VERIFY -> RECOVERY LEDGER -> AUDIT -> STOP/ESCALATE
    */
-  public static async processCase(caseId: string, options?: { forceApproval?: boolean }): Promise<ExecutionResult> {
+  private static async processCaseInternal(caseId: string, options?: { forceApproval?: boolean }): Promise<ExecutionResult> {
     const recCase = db.getCaseById(caseId);
     if (!recCase) {
       throw new Error(`Case ${caseId} not found`);
@@ -57,7 +70,11 @@ export class RecoveryPipeline {
 
     const guardrails = db.getGuardrails();
     const customer = db.getCustomerById(recCase.customer_id);
-    const aiDecision = await getAIDecision(recCase, guardrails, customer);
+    // An escalation already has a persisted decision from the request that
+    // created it. Reusing that validated decision keeps human approval from
+    // issuing a second provider request (and prevents quota retries delaying
+    // an approval action).
+    const aiDecision = recCase.ai_decision || await getAIDecision(recCase, guardrails, customer);
     recCase.ai_decision = aiDecision;
 
     // Resolve which playbook config to use for execution.
@@ -325,7 +342,7 @@ export class RecoveryPipeline {
       db.addAudit(verificationAudit);
       generatedAudits.push(verificationAudit);
 
-      if (recCase.retry_count >= guardrails.maxRetries) {
+      if (recCase.retry_count >= (config?.maxRetries || guardrails.maxRetries)) {
         recCase.status = 'ESCALATED';
         recCase.current_step = 'ESCALATED_MAX_RETRIES';
         recCase.escalation_reason = `${formatRetryStatus(recCase.retry_count, config?.maxRetries || guardrails.maxRetries)}.`;
@@ -343,6 +360,18 @@ export class RecoveryPipeline {
         };
         db.addAudit(stopAudit);
         generatedAudits.push(stopAudit);
+        db.addEscalation({
+          id: `esc_${recCase.id}_${Date.now().toString().slice(-6)}`,
+          case_id: recCase.id,
+          customer_name: recCase.customer_name,
+          amount: recCase.amount,
+          playbook: recCase.playbook,
+          reason: recCase.escalation_reason,
+          risk_score: recCase.customer_risk_score,
+          status: 'PENDING',
+          assigned_to: recCase.escalated_to,
+          created_at: new Date().toISOString(),
+        });
       } else {
         recCase.status = 'ACTION_IN_PROGRESS';
         recCase.current_step = 'COOLDOWN_SCHEDULED';

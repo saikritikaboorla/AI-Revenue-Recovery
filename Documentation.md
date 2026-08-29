@@ -73,7 +73,7 @@ case signal
 
 - **Function:** `getAIDecision()` in `src/lib/ai-gemini.ts`
 - **SDK:** `@google/genai`
-- **Model:** `gemini-3.6-flash`
+- **Model:** `GEMINI_MODEL` (default `gemini-3.6-flash`)
 - **Transport:** Gemini API — server-side only
 - **Key:** `GEMINI_API_KEY` environment variable — never client-side
 - **Input:** case failure reason, amount, segment, risk score, retry count,
@@ -123,7 +123,7 @@ Every processed case trace shows an "AI Decision Evidence" panel:
 - **● GEMINI** badge when a real Gemini call succeeded
 - **● DETERMINISTIC FALLBACK** badge when Gemini failed and the fallback ran
 - Provider: Google Gemini
-- Model: `gemini-2.5-flash`
+- Model: `GEMINI_MODEL` (default `gemini-3.6-flash`)
 - Root cause (from model)
 - Recommended playbook (validated against 7 fixed types)
 - Confidence (model-returned 0.0–1.0)
@@ -159,6 +159,12 @@ flushes the same repository to one private Vercel Blob JSON document. This
 keeps simulator cases available when Queue and Trace requests reach different
 serverless instances. `DELETE /api/cases` restores the verified seed state.
 
+Production reads bypass the Blob CDN cache for canonical state, and durable
+writes are serialized within each warm runtime before merging the latest shared
+snapshot. This prevents ordinary cache/cold-start races from presenting stale
+Audit, Queue, Trace, Ledger, or Escalation data. Cross-region transactional
+storage remains a prototype limitation.
+
 ## 8. Environment and security
 
 `GEMINI_API_KEY` is read server-side only from the environment variable.
@@ -189,6 +195,9 @@ The following checks were performed against the implemented app:
   events with `GUARDRAIL_COMPLIANCE_MONITOR` actor.
 - Reset: `DELETE /api/cases` removes simulator cases and derived totals.
 - Security: no `NEXT_PUBLIC_` AI key exists; API key is server-side only.
+- Live validation: production returned all operational APIs, Audit returned the
+  complete requested event snapshot, approval reused a persisted decision, and
+  duplicate approval was idempotent.
 
 ## 10. Review against the problem statement
 
