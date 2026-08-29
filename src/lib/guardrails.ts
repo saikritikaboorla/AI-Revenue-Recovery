@@ -1,9 +1,13 @@
-import type { RecoveryCaseRecord, GuardrailPolicy } from './db';
+import type { RecoveryCaseRecord, GuardrailPolicy, CustomerRecord } from './db';
 
-export function evaluateGuardrails(recCase: RecoveryCaseRecord, guardrails: GuardrailPolicy, maxRetries: number) {
+export function evaluateGuardrails(recCase: RecoveryCaseRecord, guardrails: GuardrailPolicy, maxRetries: number, customer?: CustomerRecord) {
   const retryLimitPassed = recCase.retry_count < maxRetries;
   const riskThresholdPassed = recCase.customer_risk_score <= guardrails.maxRiskScoreForAutonomousAction;
   const valueCeilingPassed = recCase.amount <= guardrails.highValueThreshold;
+  const playbookAllowed = guardrails.allowedPlaybooks.includes(recCase.playbook);
+  const optedOut = Boolean(customer?.do_not_contact) || /DO_NOT_CONTACT|DND|OPT.?OUT/i.test(customer?.contact_preference || '');
+  const contactAllowed = !guardrails.customerOptOutEnforced || !optedOut;
+  const automationAllowed = guardrails.automationMode === 'AUTONOMOUS';
 
   return {
     maxRetriesUnderLimit: retryLimitPassed,
@@ -15,7 +19,10 @@ export function evaluateGuardrails(recCase: RecoveryCaseRecord, guardrails: Guar
     amount: recCase.amount,
     highValueThreshold: guardrails.highValueThreshold,
     valueApproved: valueCeilingPassed,
-    overallGuardrailPassed: retryLimitPassed && riskThresholdPassed && valueCeilingPassed,
+    playbookAllowed,
+    contactAllowed,
+    automationAllowed,
+    overallGuardrailPassed: retryLimitPassed && riskThresholdPassed && valueCeilingPassed && playbookAllowed && contactAllowed && automationAllowed,
   };
 }
 
@@ -24,6 +31,9 @@ export function getGuardrailTrigger(checks: ReturnType<typeof evaluateGuardrails
   if (!checks.maxRetriesUnderLimit) triggers.push(`MAX RETRIES REACHED (${checks.retryCount}/${checks.maxRetriesAllowed})`);
   if (!checks.riskScoreApproved) triggers.push(`Risk score (${checks.customerRiskScore}) exceeds ceiling (${checks.maxRiskScoreAllowed})`);
   if (!checks.valueApproved) triggers.push(`High financial exposure (₹${checks.amount.toLocaleString('en-IN')} exceeds ₹${checks.highValueThreshold.toLocaleString('en-IN')} threshold)`);
+  if (!checks.playbookAllowed) triggers.push('PLAYBOOK BLOCKED BY MERCHANT POLICY');
+  if (!checks.contactAllowed) triggers.push('CUSTOMER OPTED OUT / DO NOT CONTACT');
+  if (!checks.automationAllowed) triggers.push('REVIEW-FIRST MODE REQUIRES HUMAN APPROVAL');
   return triggers.length ? triggers.join('; ') : null;
 }
 

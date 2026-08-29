@@ -106,7 +106,7 @@ export function createAIDecision(
   const now = new Date().toISOString();
   const riskScore = Math.max(0, Math.min(100, recCase.customer_risk_score));
   const recoveryProbability = Math.max(0, Math.min(1, recCase.recovery_confidence / 100));
-  const retryLimit = recCase.retry_count < (config?.maxRetries || guardrails.maxRetries);
+  const retryLimit = recCase.retry_count < Math.min(config?.maxRetries || guardrails.maxRetries, guardrails.maxRetries);
   const riskAllowed = riskScore <= guardrails.maxRiskScoreForAutonomousAction;
   const amountAllowed = recCase.amount <= guardrails.highValueThreshold;
   const duplicateProtection = recCase.status !== 'RECOVERED' && dbLedgerAbsent(recCase);
@@ -118,12 +118,12 @@ export function createAIDecision(
   const factors: AIDecisionFactor[] = [
     { factor: 'Payment history', signal: historyRate >= 65 ? 'POSITIVE' : historyRate >= 40 ? 'NEUTRAL' : 'NEGATIVE', value: historyRate, evidence: customer ? `${historyRate}% historical recovery rate for ${customer.segment.replace(/_/g, ' ')} customer.` : 'Customer history unavailable in the case record.' },
     { factor: 'Failure type', signal: /TIMEOUT|DOWNTIME|DROPOFF|EXPIRATION/i.test(recCase.failure_reason) ? 'POSITIVE' : 'NEUTRAL', value: /TIMEOUT|DOWNTIME|DROPOFF|EXPIRATION/i.test(recCase.failure_reason) ? 1 : 0, evidence: `${issueLabel(recCase.failure_reason)} classified from ${recCase.failure_reason}.` },
-    { factor: 'Retry availability', signal: retryLimit ? 'POSITIVE' : 'NEGATIVE', value: Math.max(0, (config?.maxRetries || guardrails.maxRetries) - recCase.retry_count), evidence: `${formatRetryStatus(recCase.retry_count, config?.maxRetries || guardrails.maxRetries)} attempts.` },
+    { factor: 'Retry availability', signal: retryLimit ? 'POSITIVE' : 'NEGATIVE', value: Math.max(0, Math.min(config?.maxRetries || guardrails.maxRetries, guardrails.maxRetries) - recCase.retry_count), evidence: `${formatRetryStatus(recCase.retry_count, Math.min(config?.maxRetries || guardrails.maxRetries, guardrails.maxRetries))} attempts.` },
     { factor: 'Risk threshold', signal: riskAllowed ? 'POSITIVE' : 'NEGATIVE', value: riskScore, evidence: `Risk ${riskScore}/100 versus autonomous ceiling ${guardrails.maxRiskScoreForAutonomousAction}.` },
     { factor: 'Amount threshold', signal: amountAllowed ? 'POSITIVE' : 'NEGATIVE', value: recCase.amount, evidence: `At-risk amount ₹${recCase.amount.toLocaleString('en-IN')} versus ceiling ₹${guardrails.highValueThreshold.toLocaleString('en-IN')}.` },
   ];
   const checks: AIGuardrailCheck[] = [
-    { name: 'Retry limit', status: retryLimit ? 'PASS' : 'ESCALATE', value: formatRetryStatus(recCase.retry_count, config?.maxRetries || guardrails.maxRetries), reason: retryLimit ? 'Retry budget remains available.' : 'Retry limit exceeded.' },
+    { name: 'Retry limit', status: retryLimit ? 'PASS' : 'ESCALATE', value: formatRetryStatus(recCase.retry_count, Math.min(config?.maxRetries || guardrails.maxRetries, guardrails.maxRetries)), reason: retryLimit ? 'Retry budget remains available.' : 'Retry limit exceeded.' },
     { name: 'Cooldown period', status: 'PASS', value: `${guardrails.cooldownHours}h policy`, reason: 'No cooldown violation is recorded by the current case state.' },
     { name: 'Risk threshold', status: riskAllowed ? 'PASS' : 'ESCALATE', value: `${riskScore}/100`, reason: riskAllowed ? 'Risk is within autonomous ceiling.' : 'Risk exceeds autonomous ceiling.' },
     { name: 'Amount threshold', status: amountAllowed ? 'PASS' : 'ESCALATE', value: `₹${recCase.amount.toLocaleString('en-IN')}`, reason: amountAllowed ? 'Amount is within autonomous action ceiling.' : 'High-value case requires human review.' },

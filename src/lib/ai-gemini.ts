@@ -154,7 +154,7 @@ export async function getAIDecision(recCase: RecoveryCaseRecord, guardrails: Gua
           contents: buildCaseContext(normalizedCase, guardrails, customer),
           // Gemini 3.6 supports structured output; no legacy thinking option
           // is needed for this short diagnosis/recommendation request.
-          config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.1, maxOutputTokens: 2048, responseMimeType: 'application/json' },
+          config: { systemInstruction: SYSTEM_INSTRUCTION, maxOutputTokens: 2048, responseMimeType: 'application/json' },
         }),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Gemini request timed out')), REQUEST_TIMEOUT_MS)),
       ]);

@@ -76,7 +76,7 @@ validates the recommendation and enforces guardrails.
 ### Provider and model
 
 - **Provider:** Google Gemini
-- **Model:** `GEMINI_MODEL` (default `gemini-3.6-flash`)
+- **Model:** `GEMINI_MODEL` (default `gemini-3.6-flash`, Google Gemini API via `@google/genai`)
 - **Call location:** `src/lib/ai-gemini.ts` — `getAIDecision()` function
 
 ### What the model receives
@@ -197,6 +197,15 @@ npm run dev
 Set `GEMINI_API_KEY` in `.env.local` for live AI diagnosis. Without it the
 system runs with the deterministic fallback and clearly labels decisions as
 such. Open <http://localhost:3000>.
+
+Merchant controls persist retry limits, autonomous exposure, allowed
+playbooks, automation mode, communication permission, and opt-out/DND
+enforcement. These are backend policy gates: Gemini recommends, but cannot
+change policy or execute financial actions. Gemini requests have a bounded
+deadline and transient-only retries; timeout, quota, provider, authorization,
+network, and invalid-schema results use an explicit sanitized deterministic
+fallback. AI-assisted counts include only validated Gemini decisions used by
+the pipeline.
 
 Production validation commands:
 

@@ -4,7 +4,6 @@ import { createAIDecision } from '../ai-decision';
 import { getAIDecision } from '../ai-gemini';
 import { formatRetryStatus } from '../guardrails';
 
-const MODEL_LABEL = process.env.GEMINI_MODEL?.trim() || 'gemini-3.6-flash';
 
 export interface ExecutionResult {
   success: boolean;
@@ -100,6 +99,7 @@ export class RecoveryPipeline {
     const config = aiRecommendedPlaybook
       ? PLAYBOOK_CONFIGS[aiRecommendedPlaybook]
       : PLAYBOOK_CONFIGS[recCase.playbook];
+    const effectiveMaxRetries = Math.min(guardrails.maxRetries, config?.maxRetries ?? guardrails.maxRetries);
 
     // Stage 0: Record DETECT if not present
     const existingAudits = db.getAuditsByCaseId(caseId);
@@ -169,7 +169,7 @@ export class RecoveryPipeline {
       details: aiDecision.aiFallbackUsed
         ? `Deterministic fallback used (${aiDecision.aiFallbackReason}). ${aiDecision.detectedIssue}. ${aiDecision.expectedOutcome}`
         : (() => {
-            const base = `[AI: ${aiDecision.aiProvider ?? 'Gemini'} / ${aiDecision.aiModel ?? MODEL_LABEL}] ${aiDecision.detectedIssue}. Recommended: ${aiDecision.selectedPlaybook}.`;
+            const base = `[AI: ${aiDecision.aiProvider ?? 'Gemini'} / ${aiDecision.aiModel ?? 'model unavailable'}] ${aiDecision.detectedIssue}. Recommended: ${aiDecision.selectedPlaybook}.`;
             const playbookNote = aiRecommendedPlaybook && aiRecommendedPlaybook !== recCase.playbook
               ? ` AI adopted playbook ${aiRecommendedPlaybook} (seeded: ${recCase.playbook}).`
               : '';
@@ -183,22 +183,35 @@ export class RecoveryPipeline {
     recCase.status = 'DECIDED';
     recCase.current_step = 'CHECK_GUARDRAILS';
 
-    const retryLimitPassed = recCase.retry_count < (config?.maxRetries || guardrails.maxRetries);
+    const retryLimitPassed = recCase.retry_count < effectiveMaxRetries;
     const riskThresholdPassed = recCase.customer_risk_score <= guardrails.maxRiskScoreForAutonomousAction;
     const valueCeilingPassed = recCase.amount <= guardrails.highValueThreshold;
+    const playbookAllowed = guardrails.allowedPlaybooks.includes(recCase.playbook);
+    const customerOptedOut = Boolean(customer?.do_not_contact) || /DO_NOT_CONTACT|DND|OPT.?OUT/i.test(customer?.contact_preference || '');
+    const contactAllowed = !guardrails.customerOptOutEnforced || !customerOptedOut;
+    const automationAllowed = guardrails.automationMode === 'AUTONOMOUS';
 
-    const guardrailPassed = retryLimitPassed && riskThresholdPassed && valueCeilingPassed;
+    const proposedAction = aiDecision.selectedAction === 'human_review'
+      ? (config.allowedActions[0] || 'human_review')
+      : aiDecision.selectedAction;
+    const communicationAction = /send|notify|dispatch|whatsapp|sms|voice|ivr|link/i.test(proposedAction);
+    const communicationAllowed = !communicationAction || guardrails.automatedCommunicationEnabled;
+    const guardrailPassed = retryLimitPassed && riskThresholdPassed && valueCeilingPassed && playbookAllowed && contactAllowed && automationAllowed && communicationAllowed;
 
     // Check if Human Escalation is triggered
-    if (!guardrailPassed && !options?.forceApproval) {
+    if (!guardrailPassed && (!options?.forceApproval || !playbookAllowed || !contactAllowed)) {
       recCase.status = 'ESCALATED';
       recCase.current_step = 'ESCALATED_HUMAN_APPROVAL';
       recCase.requires_human_approval = true;
       
       let escReason = 'Guardrail trigger: ';
-      if (!retryLimitPassed) escReason += `${formatRetryStatus(recCase.retry_count, config?.maxRetries || guardrails.maxRetries)}. `;
+      if (!retryLimitPassed) escReason += `${formatRetryStatus(recCase.retry_count, effectiveMaxRetries)}. `;
       if (!riskThresholdPassed) escReason += `Risk score (${recCase.customer_risk_score}) exceeds ceiling (${guardrails.maxRiskScoreForAutonomousAction}). `;
       if (!valueCeilingPassed) escReason += `Amount (₹${recCase.amount.toLocaleString('en-IN')}) exceeds high-value threshold (₹${guardrails.highValueThreshold.toLocaleString('en-IN')}). `;
+      if (!playbookAllowed) escReason += `Playbook ${recCase.playbook} is not allowed by merchant policy. `;
+      if (!contactAllowed) escReason += 'Customer is opted out / marked do-not-contact. ';
+      if (!automationAllowed) escReason += 'Merchant policy is review-first. ';
+      if (!communicationAllowed) escReason += 'Automated communication is disabled by merchant policy. ';
 
       recCase.escalation_reason = escReason;
       recCase.escalated_to = 'Senior FinTech Operations Manager';
@@ -247,9 +260,7 @@ export class RecoveryPipeline {
     recCase.current_step = 'EXECUTE_ACTION';
     recCase.retry_count += 1;
 
-    const action = aiDecision.selectedAction === 'human_review'
-      ? (config.allowedActions[0] || 'smart_retry_payment')
-      : aiDecision.selectedAction;
+    const action = proposedAction;
     recCase.last_action = action;
 
     const actAudit: AuditRecord = {
@@ -342,10 +353,10 @@ export class RecoveryPipeline {
       db.addAudit(verificationAudit);
       generatedAudits.push(verificationAudit);
 
-      if (recCase.retry_count >= (config?.maxRetries || guardrails.maxRetries)) {
+      if (recCase.retry_count >= effectiveMaxRetries) {
         recCase.status = 'ESCALATED';
         recCase.current_step = 'ESCALATED_MAX_RETRIES';
-        recCase.escalation_reason = `${formatRetryStatus(recCase.retry_count, config?.maxRetries || guardrails.maxRetries)}.`;
+        recCase.escalation_reason = `${formatRetryStatus(recCase.retry_count, effectiveMaxRetries)}.`;
         recCase.escalated_to = 'Commercial Operations Lead';
 
         const stopAudit: AuditRecord = {

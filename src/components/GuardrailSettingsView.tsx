@@ -25,6 +25,10 @@ interface GuardrailPolicy {
   maxRiskScoreForAutonomousAction: number;
   dailyContactLimit: number;
   enableAssistedVoiceForEnterpriseOnly: boolean;
+  allowedPlaybooks: string[];
+  automatedCommunicationEnabled: boolean;
+  customerOptOutEnforced: boolean;
+  automationMode: 'AUTONOMOUS' | 'REVIEW_FIRST';
 }
 
 const DEFAULTS: GuardrailPolicy = {
@@ -34,6 +38,10 @@ const DEFAULTS: GuardrailPolicy = {
   maxRiskScoreForAutonomousAction: 65,
   dailyContactLimit: 2,
   enableAssistedVoiceForEnterpriseOnly: false,
+  allowedPlaybooks: Object.keys(PLAYBOOK_CONFIGS),
+  automatedCommunicationEnabled: true,
+  customerOptOutEnforced: true,
+  automationMode: 'AUTONOMOUS',
 };
 
 interface RuleCardConfig {
@@ -116,7 +124,21 @@ const RULE_CARDS: RuleCardConfig[] = [
     type: 'toggle',
     icon: <PhoneCall className="h-4 w-4" />,
   },
-];
+  {
+    key: 'automatedCommunicationEnabled',
+    label: 'Automated Communication Permission',
+    description: 'Allow bounded simulated payment-link and outreach actions. Disabled means escalation and an audit event.',
+    type: 'toggle',
+    icon: <PhoneCall className="h-4 w-4" />,
+  },
+  {
+    key: 'customerOptOutEnforced',
+    label: 'Enforce Customer Opt-Out / DND',
+    description: 'Block recovery communication for customers marked do-not-contact or opted out, then escalate with a recorded reason.',
+    type: 'toggle',
+    icon: <ShieldCheck className="h-4 w-4" />,
+  },
+]; 
 
 // Informational guardrail logic cards
 const INFO_CARDS = [
@@ -368,12 +390,12 @@ export const GuardrailSettingsView: React.FC = () => {
             <p className="mt-1 text-xs text-slate-400">The merchant defines the boundaries. AI recommends; policy validates; the execution layer acts.</p>
           </div>
           <div className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
-            <div><span className="text-slate-500">Automation mode</span><p className="mt-1 font-semibold text-white">Autonomous within policy · human review on triggers</p></div>
+            <div><span className="text-slate-500">Automation mode</span><p className="mt-1 font-semibold text-white">{settings.automationMode === 'REVIEW_FIRST' ? 'Review first · human approval required' : 'Autonomous within policy · human review on triggers'}</p></div>
             <div><span className="text-slate-500">Human approval triggers</span><p className="mt-1 font-semibold text-white">Risk &gt; {settings.maxRiskScoreForAutonomousAction} · amount &gt; ₹{settings.highValueThreshold.toLocaleString('en-IN')} · retry limit</p></div>
             <div><span className="text-slate-500">Maximum autonomous exposure</span><p className="mt-1 font-semibold text-white">₹{settings.highValueThreshold.toLocaleString('en-IN')} per case</p></div>
             <div><span className="text-slate-500">Communication policy</span><p className="mt-1 font-semibold text-white">{settings.dailyContactLimit} contacts/day · {settings.cooldownHours}h cooldown · simulated channels only</p></div>
           </div>
-          <div><span className="text-xs text-slate-500">Allowed bounded recovery playbooks</span><div className="mt-2 flex flex-wrap gap-2">{Object.values(PLAYBOOK_CONFIGS).map(playbook => <span key={playbook.type} className="rounded-full border border-cyan-400/20 bg-cyan-400/5 px-2.5 py-1 text-[11px] text-cyan-100">{playbook.displayName}</span>)}</div></div>
+          <div><span className="text-xs text-slate-500">Allowed bounded recovery playbooks (click to toggle)</span><div className="mt-2 flex flex-wrap gap-2">{Object.values(PLAYBOOK_CONFIGS).map(playbook => { const allowed = settings.allowedPlaybooks.includes(playbook.type); return <button type="button" key={playbook.type} onClick={() => handleChange('allowedPlaybooks', allowed ? settings.allowedPlaybooks.filter(item => item !== playbook.type) : [...settings.allowedPlaybooks, playbook.type])} className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors ${allowed ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-100' : 'border-rose-400/30 bg-rose-400/5 text-rose-200 line-through'}`}>{playbook.displayName}</button>; })}</div></div>
         </div>
       )}
 

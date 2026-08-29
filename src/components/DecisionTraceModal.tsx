@@ -141,8 +141,17 @@ function Info({ label, value }: { label: string; value: string }) { return <div 
 
 function AIEvidenceSection({ aiDecision }: { aiDecision: Trace['aiDecision'] }) {
   const [rawOpen, setRawOpen] = useState(false);
+  const [jsonOpen, setJsonOpen] = useState(false);
   const isAI = aiDecision.source === 'GEMINI_AI' && !aiDecision.aiFallbackUsed;
   const isFallback = aiDecision.aiFallbackUsed;
+  const structuredResponse = isAI ? {
+    diagnosis: aiDecision.diagnosis,
+    rootCause: aiDecision.aiRootCause ?? aiDecision.detectedIssue,
+    confidence: `${aiDecision.confidencePercent}%`,
+    recommendedPlaybook: aiDecision.selectedPlaybook,
+    reasoning: aiDecision.aiReasoning ?? '',
+    relevantSignals: aiDecision.aiRelevantSignals ?? [],
+  } : null;
 
   return (
     <section className="rounded-2xl border border-blue-400/30 bg-[#0b1527] p-4 sm:p-5">
@@ -233,23 +242,36 @@ function AIEvidenceSection({ aiDecision }: { aiDecision: Trace['aiDecision'] }) 
         </p>
       </div>
 
-      {/* Raw model response (collapsed) */}
-      {aiDecision.aiRawResponse && (
+      {/* Validated structured response (collapsed) */}
+      {isAI && structuredResponse && (
         <div className="mt-4">
           <button
             onClick={() => setRawOpen(v => !v)}
-            className="flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-slate-200"
+            aria-expanded={rawOpen}
+            className="flex w-full items-center justify-between gap-2 rounded-xl border border-blue-400/20 bg-blue-400/5 px-3 py-2 text-left text-xs font-semibold text-blue-200 hover:border-blue-400/40"
           >
-            <ChevronRight className={`h-3 w-3 transition-transform ${rawOpen ? 'rotate-90' : ''}`} />
-            {rawOpen ? 'Hide' : 'Show'} Structured Model Response
+            <span className="flex items-center gap-2"><ChevronRight className={`h-3 w-3 transition-transform ${rawOpen ? 'rotate-90' : ''}`} />{rawOpen ? 'Hide' : 'Show'} validated structured model response</span>
+            <span className="font-mono text-[10px] text-slate-500">JSON schema · validated</span>
           </button>
           {rawOpen && (
-            <pre className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-[#26374d] bg-[#060b14] p-3 text-[11px] leading-relaxed text-slate-300 whitespace-pre-wrap break-words">
-              {aiDecision.aiRawResponse}
-            </pre>
+            <div className="mt-2 rounded-xl border border-[#26374d] bg-[#060b14] p-3">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <StructuredField label="diagnosis" value={structuredResponse.diagnosis} wide />
+                <StructuredField label="rootCause" value={structuredResponse.rootCause} />
+                <StructuredField label="confidence" value={structuredResponse.confidence} />
+                <StructuredField label="recommendedPlaybook" value={structuredResponse.recommendedPlaybook} />
+                <StructuredField label="reasoning" value={structuredResponse.reasoning} wide />
+                <div className="rounded-lg border border-blue-400/15 bg-blue-400/5 p-2 sm:col-span-2"><p className="font-mono text-[10px] text-blue-300">relevantSignals</p><div className="mt-1 flex flex-wrap gap-1.5">{structuredResponse.relevantSignals.map((signal, index) => <span key={`${signal}-${index}`} className="rounded-full border border-slate-700 bg-slate-900 px-2 py-1 text-[11px] text-slate-300">{signal}</span>)}</div></div>
+              </div>
+              {aiDecision.aiRawResponse && <><button type="button" onClick={() => setJsonOpen(v => !v)} className="mt-3 flex items-center gap-1 text-[10px] font-semibold text-slate-500 hover:text-slate-300"><ChevronRight className={`h-3 w-3 transition-transform ${jsonOpen ? 'rotate-90' : ''}`} />{jsonOpen ? 'Hide' : 'Show'} provider JSON</button>{jsonOpen && <pre className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-[#26374d] bg-[#030711] p-3 text-[10px] leading-relaxed text-slate-400 whitespace-pre-wrap break-words">{(() => { try { return JSON.stringify(JSON.parse(aiDecision.aiRawResponse), null, 2); } catch { return aiDecision.aiRawResponse; } })()}</pre>}</>}
+            </div>
           )}
         </div>
       )}
     </section>
   );
+}
+
+function StructuredField({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
+  return <div className={`rounded-lg border border-blue-400/15 bg-blue-400/5 p-2 ${wide ? 'sm:col-span-2' : ''}`}><p className="font-mono text-[10px] text-blue-300">{label}</p><p className="mt-1 text-xs leading-relaxed text-slate-300">{value || '—'}</p></div>;
 }

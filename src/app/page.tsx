@@ -12,8 +12,6 @@ import {
   PlayCircle,
   AlertTriangle,
   CheckCircle2,
-  TrendingUp,
-  Users,
   ChevronRight,
   Shield,
   BarChart3,
@@ -30,8 +28,7 @@ import {
 interface Metrics {
   totalRevenueAtRisk?: number;
   totalRevenueRecovered?: number;
-  overallRecoveryRate?: number;
-  totalCasesCount?: number;
+  ledgerEntriesCount?: number;
 }
 
 // ── Pipeline steps ───────────────────────────────────────────────────────────
@@ -187,25 +184,12 @@ export default function LandingPage() {
       iconCls: 'text-emerald-400',
     },
     {
-      label: 'Recovery Win Rate',
-      value: metrics
-        ? `${metrics.overallRecoveryRate ?? 0}%`
-        : null,
-      sub:   'Verified settlements only',
-      valueColor: 'text-blue-400',
-      borderGlow: 'border-blue-500/30 shadow-[0_0_18px_rgba(59,130,246,0.1)]',
-      Icon: TrendingUp,
-      iconCls: 'text-blue-400',
-    },
-    {
-      label: 'Active Cases',
-      value: metrics
-        ? String(metrics.totalCasesCount ?? 0)
-        : null,
-      sub:   'Append-only recovery event ledger',
+      label: 'Verified Recoveries',
+      value: metrics ? String(metrics.ledgerEntriesCount ?? 0) : null,
+      sub: 'Webhook-confirmed ledger entries',
       valueColor: 'text-cyan-400',
       borderGlow: 'border-cyan-500/30 shadow-[0_0_18px_rgba(34,211,238,0.1)]',
-      Icon: Users,
+      Icon: CheckCircle2,
       iconCls: 'text-cyan-400',
     },
   ];
@@ -227,44 +211,46 @@ export default function LandingPage() {
         {/* ════════════════════════════════════════════════════════════════════
             HERO
         ════════════════════════════════════════════════════════════════════ */}
-        <section className="relative pt-24 pb-20 md:pt-36 md:pb-28 px-4 sm:px-6 lg:px-8 text-center max-w-6xl mx-auto">
+        <section className="relative pt-20 pb-16 md:pt-28 md:pb-20 px-4 sm:px-6 lg:px-8 text-center max-w-6xl mx-auto">
 
           {/* Precision Badge */}
-          <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-[11px] sm:text-xs font-semibold tracking-[0.12em] uppercase mb-12 sm:mb-16 shadow-[0_0_25px_rgba(59,130,246,0.18)] backdrop-blur-md">
+          <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-[11px] sm:text-xs font-semibold tracking-[0.12em] uppercase mb-6 sm:mb-8 shadow-[0_0_25px_rgba(59,130,246,0.18)] backdrop-blur-md">
             <Zap className="h-4 w-4 text-blue-400 shrink-0" />
-            AI-Assisted Closed-Loop Revenue Recovery
+            AI-Assisted Revenue Recovery
           </div>
 
           {/* Large Bold Hero Headline */}
-          <h1 className="mx-auto max-w-5xl text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-[-0.035em] text-white leading-[1.06] mb-9 sm:mb-11">
-            REVENUE IS SLIPPING. <br className="hidden sm:block" />
+          <h1 className="mx-auto max-w-5xl text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-[-0.035em] text-white leading-[1.06] mb-6 sm:mb-8">
+            RECOVER REVENUE <br className="hidden sm:block" />
             <span className="bg-gradient-to-r from-blue-400 via-teal-300 to-indigo-400 bg-clip-text text-transparent">
-              THE ENGINE FINDS IT.
+              BEFORE IT SLIPS AWAY.
             </span>
           </h1>
 
           {/* Separate text blocks keep the product proposition editorial and readable. */}
-          <p className="text-base sm:text-lg md:text-xl text-[#D7E2F2] font-normal max-w-3xl mx-auto leading-[1.8] tracking-[0.01em] mb-5">
-            Detect revenue risk. Diagnose the cause. Choose the right recovery playbook. Execute within guardrails. Verify the money.
+          <p className="text-base sm:text-lg md:text-xl text-[#D7E2F2] font-normal max-w-3xl mx-auto leading-[1.65] tracking-[0.01em] mb-5">
+            Detect revenue at risk, use Gemini for case diagnosis and recovery recommendations, execute only within deterministic merchant guardrails, and verify recovered revenue through settlement evidence.
           </p>
 
           {/* Supporting Trust Line */}
-          <p className="text-sm sm:text-base text-[#93A7C3] font-medium max-w-2xl mx-auto leading-[1.75] tracking-[0.015em] mb-12 sm:mb-14">
-            Every recovery is measured and recorded in an auditable ledger. The runtime decisioning remains deterministic in this build.
+          <p className="text-sm sm:text-base text-[#93A7C3] font-medium max-w-2xl mx-auto leading-[1.6] tracking-[0.015em] mb-7 sm:mb-9">
+            Gemini recommends. Deterministic guardrails control execution.
+          </p>
+          <p className="mb-7 text-xs font-semibold uppercase tracking-[0.16em] text-[#6F88AA] sm:mb-9">
+            Built for merchants and revenue operations teams
           </p>
 
           <p className="text-sm sm:text-base text-[#93A7C3] font-medium max-w-2xl mx-auto leading-[1.75] tracking-[0.015em] mb-12 sm:mb-14">
-            Gemini provides case diagnosis and recovery-playbook recommendations. Deterministic guardrails control execution.
           </p>
 
           {/* CTAs with 3D Depth */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-20">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
             <Link
               href="/dashboard"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-9 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold text-base sm:text-lg transition-all shadow-[0_10px_30px_rgba(37,99,235,0.4)] hover:shadow-[0_15px_40px_rgba(37,99,235,0.6)] hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               <Activity className="h-5 w-5 shrink-0" />
-              LAUNCH COMMAND CENTER
+              EXPLORE RECOVERY COMMAND CENTER
               <ArrowRight className="h-5 w-5 shrink-0" />
             </Link>
 
@@ -277,13 +263,13 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* 3D Visual Pipeline Container */}
-          <div className="relative rounded-3xl border border-blue-500/20 bg-gradient-to-b from-[#0F172A]/90 to-[#070A12]/90 p-6 sm:p-8 backdrop-blur-xl shadow-[0_25px_60px_rgba(0,0,0,0.7),0_0_40px_rgba(59,130,246,0.15)] mb-16 text-left">
+          {/* Compact product workflow */}
+          <div className="relative rounded-2xl border border-blue-500/20 bg-gradient-to-b from-[#0F172A]/90 to-[#070A12]/90 p-4 sm:p-5 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.45),0_0_30px_rgba(59,130,246,0.1)] mb-8 text-left">
             <div className="flex items-center justify-between border-b border-[#1E2A3A] pb-4 mb-6">
               <div className="flex items-center gap-2.5">
                 <div className="h-3 w-3 rounded-full bg-teal-400 shadow-[0_0_10px_#2DD4BF] animate-pulse" />
                 <span className="text-xs sm:text-sm font-mono uppercase tracking-widest text-[#94A3B8]">
-                  Closed-Loop Bounded Architecture
+                  Recovery workflow
                 </span>
               </div>
               <span className="text-xs font-mono px-2.5 py-1 rounded-md bg-teal-950/60 border border-teal-500/30 text-teal-300">
@@ -292,7 +278,7 @@ export default function LandingPage() {
             </div>
 
             {/* 5-Node Visual Flow */}
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 relative">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3 relative">
               {[
                 { step: '01', title: 'Revenue At Risk', desc: 'Webhook catches dropoffs & bank declines', color: 'border-amber-500/30 bg-amber-500/5 text-amber-400' },
                 { step: '02', title: 'Automated Detection', desc: 'Deterministic context analysis of the root failure code and risk factor', color: 'border-blue-500/30 bg-blue-500/5 text-blue-400' },
@@ -302,17 +288,17 @@ export default function LandingPage() {
               ].map((node, idx) => (
                 <div
                   key={node.step}
-                  className={`rounded-2xl border ${node.color} p-4 sm:p-5 flex flex-col justify-between transition-all hover:-translate-y-1 hover:shadow-lg backdrop-blur-md`}
+                  className={`rounded-xl border ${node.color} p-3 sm:p-4 flex flex-col justify-center transition-all hover:-translate-y-1 hover:shadow-lg backdrop-blur-md`}
                 >
                   <div>
-                    <span className="text-[11px] font-mono font-bold tracking-widest opacity-80 mb-2 block">
+                    <span className="text-[10px] font-mono font-bold tracking-widest opacity-80 mb-1 block">
                       STAGE {node.step}
                     </span>
-                    <h4 className="text-base sm:text-lg font-bold text-[#F1F5F9] mb-1 leading-snug">
-                      {node.title}
+                    <h4 className="text-sm sm:text-base font-bold text-[#F1F5F9] leading-snug">
+                      {['DETECT', 'DIAGNOSE', 'GUARD', 'RECOVER', 'VERIFY'][idx]}
                     </h4>
                   </div>
-                  <p className="text-xs sm:text-sm text-[#8EA2C6] leading-relaxed mt-2">
+                  <p className="hidden text-xs sm:text-sm text-[#8EA2C6] leading-relaxed mt-2">
                     {node.desc}
                   </p>
                 </div>
@@ -321,7 +307,7 @@ export default function LandingPage() {
           </div>
 
           {/* ── Live Metric Cards ──────────────────────────────────────────── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto text-left">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-4xl mx-auto text-left">
             {metricsFetching
               ? Array.from({ length: 4 }).map((_, i) => <MetricSkeleton key={i} />)
               : metricCards.map((m) => {

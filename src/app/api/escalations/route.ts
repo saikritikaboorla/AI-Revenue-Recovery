@@ -13,8 +13,8 @@ export async function GET() {
     const recCase = db.getCaseById(escalation.case_id);
     if (!recCase) return escalation;
     const guardrails = db.getGuardrails();
-    const maxRetries = PLAYBOOK_CONFIGS[recCase.playbook]?.maxRetries || guardrails.maxRetries;
-    const trigger = getGuardrailTrigger(evaluateGuardrails(recCase, guardrails, maxRetries));
+    const maxRetries = Math.min(PLAYBOOK_CONFIGS[recCase.playbook]?.maxRetries || guardrails.maxRetries, guardrails.maxRetries);
+    const trigger = getGuardrailTrigger(evaluateGuardrails(recCase, guardrails, maxRetries, db.getCustomerById(recCase.customer_id)));
     // Older seed rows contain a generic reason; current guardrail results are authoritative.
     return {
       ...escalation,
@@ -76,8 +76,6 @@ export async function POST(req: NextRequest) {
         result: 'DECIDED',
         details: `Senior Operations Specialist approved autonomous execution for case ${caseId}. Guardrails overridden with human authority.`
       });
-      await db.flushDurableState();
-
       // Execute pipeline with force approval
       const pipelineResult = await RecoveryPipeline.processCase(caseId, { forceApproval: true });
       await db.flushDurableState();

@@ -55,8 +55,8 @@ export async function GET(
   const audits = db.getAuditsByCaseId(id);
 
   // Real guardrail check evaluation
-  const maxRetries = config?.maxRetries || guardrails.maxRetries;
-  const guardrailChecks = evaluateGuardrails(recCase, guardrails, maxRetries);
+  const maxRetries = Math.min(config?.maxRetries || guardrails.maxRetries, guardrails.maxRetries);
+  const guardrailChecks = evaluateGuardrails(recCase, guardrails, maxRetries, db.getCustomerById(recCase.customer_id));
   const retryLimitPassed = guardrailChecks.maxRetriesUnderLimit;
 
   // Structured Decision Factors derived from real record attributes
@@ -133,7 +133,7 @@ export async function GET(
         stage: 'GUARDRAILS',
         details: guardrailChecks.overallGuardrailPassed
           ? 'All applicable guardrails passed.'
-          : `Policy stopped autonomous action at ${formatRetryStatus(recCase.retry_count, maxRetries)} or a risk/value threshold.`,
+          : `Policy blocked autonomous action: ${[!guardrailChecks.maxRetriesUnderLimit ? formatRetryStatus(recCase.retry_count, maxRetries) : '', !guardrailChecks.riskScoreApproved ? `risk ${recCase.customer_risk_score}` : '', !guardrailChecks.valueApproved ? 'exposure limit' : '', !guardrailChecks.playbookAllowed ? 'playbook not allowed' : '', !guardrailChecks.contactAllowed ? 'do-not-contact' : '', !guardrailChecks.automationAllowed ? 'review-first mode' : ''].filter(Boolean).join(', ')}.`,
       },
       {
         stage: 'ACTION',

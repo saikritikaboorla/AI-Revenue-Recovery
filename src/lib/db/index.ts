@@ -11,6 +11,10 @@ const DEFAULT_GUARDRAILS: GuardrailPolicy = {
   highValueThreshold: 100000,
   dailyContactLimit: 2,
   enableAssistedVoiceForEnterpriseOnly: false,
+  allowedPlaybooks: Object.keys(PLAYBOOK_CONFIGS) as PlaybookType[],
+  automatedCommunicationEnabled: true,
+  customerOptOutEnforced: true,
+  automationMode: 'AUTONOMOUS',
 };
 
 const RUNTIME_STATE_FILE = path.join(process.cwd(), '.cache', 'recoverai-runtime-state.json');
@@ -26,6 +30,7 @@ export interface CustomerRecord {
   risk_score: number;
   past_recovery_rate: number;
   contact_preference: string;
+  do_not_contact?: boolean;
   created_at: string;
 }
 
@@ -115,6 +120,10 @@ export interface GuardrailPolicy {
   highValueThreshold: number;
   dailyContactLimit: number;
   enableAssistedVoiceForEnterpriseOnly: boolean;
+  allowedPlaybooks: PlaybookType[];
+  automatedCommunicationEnabled: boolean;
+  customerOptOutEnforced: boolean;
+  automationMode: 'AUTONOMOUS' | 'REVIEW_FIRST';
 }
 
 export class DatabaseService {
@@ -261,8 +270,14 @@ export class DatabaseService {
       // cannot overwrite cases created by another instance from a stale map.
       const existing = await getBlob(DURABLE_STATE_BLOB, { access: 'private', useCache: false });
       if (existing && !replace) {
+        // The current request has already applied an authoritative mutation.
+        // Preserve its merchant policy while merging newer cases/audits from
+        // the shared snapshot; the old implementation silently reverted a
+        // just-saved guardrail policy here.
+        const localGuardrails = this.guardrails;
         const parsed = JSON.parse(await new Response(existing.stream).text()) as Parameters<DatabaseService['applyParsedState']>[0];
         this.applyParsedState(parsed);
+        this.guardrails = localGuardrails;
       }
       await putBlob(DURABLE_STATE_BLOB, this.serializeState(), {
         access: 'private', allowOverwrite: true, contentType: 'application/json',
@@ -711,7 +726,11 @@ export class DatabaseService {
   }
 
   public getGuardrails(): GuardrailPolicy {
-    return this.guardrails;
+    return {
+      ...DEFAULT_GUARDRAILS,
+      ...this.guardrails,
+      allowedPlaybooks: this.guardrails.allowedPlaybooks?.length ? this.guardrails.allowedPlaybooks : DEFAULT_GUARDRAILS.allowedPlaybooks,
+    };
   }
 
   public updateGuardrails(policy: Partial<GuardrailPolicy>): GuardrailPolicy {
@@ -746,7 +765,19 @@ export class DatabaseService {
     if (policy.enableAssistedVoiceForEnterpriseOnly !== undefined && typeof policy.enableAssistedVoiceForEnterpriseOnly !== 'boolean') {
       throw new Error('enableAssistedVoiceForEnterpriseOnly must be boolean');
     }
-    this.guardrails = { ...this.guardrails, ...policy };
+    if (policy.allowedPlaybooks !== undefined && (!Array.isArray(policy.allowedPlaybooks) || policy.allowedPlaybooks.length === 0 || policy.allowedPlaybooks.some(item => !Object.prototype.hasOwnProperty.call(PLAYBOOK_CONFIGS, item)))) {
+      throw new Error('allowedPlaybooks must contain at least one existing playbook');
+    }
+    if (policy.automatedCommunicationEnabled !== undefined && typeof policy.automatedCommunicationEnabled !== 'boolean') {
+      throw new Error('automatedCommunicationEnabled must be boolean');
+    }
+    if (policy.customerOptOutEnforced !== undefined && typeof policy.customerOptOutEnforced !== 'boolean') {
+      throw new Error('customerOptOutEnforced must be boolean');
+    }
+    if (policy.automationMode !== undefined && policy.automationMode !== 'AUTONOMOUS' && policy.automationMode !== 'REVIEW_FIRST') {
+      throw new Error('automationMode must be AUTONOMOUS or REVIEW_FIRST');
+    }
+    this.guardrails = { ...this.getGuardrails(), ...policy };
     return this.guardrails;
   }
 

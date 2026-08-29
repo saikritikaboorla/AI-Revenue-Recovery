@@ -73,7 +73,8 @@ case signal
 
 - **Function:** `getAIDecision()` in `src/lib/ai-gemini.ts`
 - **SDK:** `@google/genai`
-- **Model:** `GEMINI_MODEL` (default `gemini-3.6-flash`)
+- **Model:** `GEMINI_MODEL` (default `gemini-3.6-flash`) through Google Gemini
+  and `@google/genai`.
 - **Transport:** Gemini API — server-side only
 - **Key:** `GEMINI_API_KEY` environment variable — never client-side
 - **Input:** case failure reason, amount, segment, risk score, retry count,
@@ -212,7 +213,7 @@ The following checks were performed against the implemented app:
 | Failed subscription | **Demonstrated as a bounded simulated action.** |
 | B2B receivables | **Demonstrated with escalation and promise-oriented actions.** |
 | Mandate retry | **Demonstrated as a bounded retry/reschedule path.** |
-| Hinglish voice recovery | **Partially demonstrated.** Static simulated preview only; no real voice call. |
+| Hinglish voice recovery | **Partially demonstrated.** Case-dependent simulated Voice/WhatsApp preview only; no real voice call or WhatsApp message. Consent, opt-out/DND, and merchant communication policy are deterministic gates. |
 | Promise-to-pay tracker | **Demonstrated.** Status actions and broken-promise escalation are present. |
 | Measured money recovered across a batch | **Strongly demonstrated.** Verified amounts are ledger-backed and visible in batch, queue, trace, analytics, and audit surfaces. |
 | Compliant escalation/stopping rules | **Demonstrated as configurable prototype policy.** |
