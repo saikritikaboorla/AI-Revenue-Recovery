@@ -3,19 +3,19 @@ import "./globals.css";
 import GradientWaves from "@/components/effects/GradientWaves";
 
 export const metadata: Metadata = {
-  title: "RecoverAI — Deterministic Revenue Recovery Platform",
-  description: "RecoverAI is a bounded recovery prototype that uses server-side Gemini diagnosis, deterministic interventions, and auditable settlement-backed ledger proof.",
+  title: "RecoverAI — AI-Governed Revenue Recovery",
+  description: "AI-assisted revenue recovery with deterministic guardrails, verified settlement, escalation and auditability.",
   metadataBase: new URL("https://ai-revenue-recovery-flame.vercel.app"),
   openGraph: {
-    title: "RecoverAI — Deterministic Revenue Recovery",
-    description: "Detect revenue risk. Diagnose the cause. Execute within guardrails. Verify the money with canonical settlement proof.",
+    title: "RecoverAI — AI-Governed Revenue Recovery",
+    description: "AI-assisted revenue recovery with deterministic guardrails, verified settlement, escalation and auditability.",
     type: "website",
-    images: [{ url: "/og-image.svg", width: 1200, height: 630, alt: "RecoverAI revenue recovery platform" }],
+    images: [{ url: "/og-image.svg", width: 1200, height: 630, alt: "RecoverAI AI-governed revenue recovery" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "RecoverAI — Deterministic Revenue Recovery",
-    description: "Detect revenue risk. Diagnose the cause. Execute within guardrails. Verify the money with canonical settlement proof.",
+    title: "RecoverAI — AI-Governed Revenue Recovery",
+    description: "AI-assisted revenue recovery with deterministic guardrails, verified settlement, escalation and auditability.",
     images: ["/og-image.svg"],
   },
 };

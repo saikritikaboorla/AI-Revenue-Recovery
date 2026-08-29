@@ -136,7 +136,7 @@ export const Navbar: React.FC = () => {
                   RecoverAI
                 </span>
                 <span className="text-[9px] tracking-widest uppercase font-medium text-[#5A6478] mt-0.5">
-                  Deterministic Revenue Recovery
+                  AI-Assisted Revenue Recovery
                 </span>
               </div>
             </Link>

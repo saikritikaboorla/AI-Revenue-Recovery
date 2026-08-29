@@ -270,7 +270,7 @@ export default function DashboardPage() {
               <span className="relative flex h-2 w-2">
                 <span className={`relative inline-flex h-2 w-2 rounded-full ${health?.services?.gemini?.status === 'AVAILABLE' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
               </span>
-              <span className="text-slate-300">Engine HEALTHY</span>
+              <span className="text-slate-300">Recovery Engine Active</span>
               <span className={health?.services?.gemini?.status === 'AVAILABLE' ? 'text-emerald-300' : 'text-amber-300'}>Gemini {health?.services?.gemini?.status === 'QUOTA_LIMITED' ? 'QUOTA LIMITED' : health?.services?.gemini?.status === 'AVAILABLE' ? 'AVAILABLE' : 'DEGRADED · FALLBACK ACTIVE'}</span>
             </div>
             <button
