@@ -191,9 +191,11 @@ export class RecoveryPipeline {
     const contactAllowed = !guardrails.customerOptOutEnforced || !customerOptedOut;
     const automationAllowed = guardrails.automationMode === 'AUTONOMOUS';
 
-    const proposedAction = aiDecision.selectedAction === 'human_review'
-      ? (config.allowedActions[0] || 'human_review')
-      : aiDecision.selectedAction;
+    // The model recommendation is data, never an executable command. Only
+    // actions declared by the effective playbook may reach the runner.
+    const proposedAction = config.allowedActions.includes(aiDecision.selectedAction)
+      ? aiDecision.selectedAction
+      : (config.allowedActions[0] || 'human_review');
     const communicationAction = /send|notify|dispatch|whatsapp|sms|voice|ivr|link/i.test(proposedAction);
     const communicationAllowed = !communicationAction || guardrails.automatedCommunicationEnabled;
     const guardrailPassed = retryLimitPassed && riskThresholdPassed && valueCeilingPassed && playbookAllowed && contactAllowed && automationAllowed && communicationAllowed;

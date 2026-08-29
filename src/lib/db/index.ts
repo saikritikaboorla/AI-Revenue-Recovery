@@ -213,6 +213,9 @@ export class DatabaseService {
     if (parsed.guardrails) this.guardrails = { ...this.guardrails, ...parsed.guardrails };
     for (const item of parsed.customers || []) this.customers.set(item.id, this.customers.get(item.id) || item);
     for (const item of parsed.cases || []) {
+      // Recovered state is terminal and cannot still require approval. Apply
+      // this invariant when a durable snapshot is hydrated after startup too.
+      if (item.status === 'RECOVERED') item.requires_human_approval = false;
       const current = this.cases.get(item.id);
       if (!current || new Date(item.updated_at).getTime() >= new Date(current.updated_at).getTime()) this.cases.set(item.id, item);
     }
@@ -593,6 +596,7 @@ export class DatabaseService {
 
       recCase.status = 'RECOVERED';
       recCase.current_step = 'VERIFIED_STOPPED';
+      recCase.requires_human_approval = false;
       recCase.recovered_amount = settledAmount;
       recCase.recovered_at = existingLedger?.verified_at || recCase.recovered_at || recCase.updated_at;
       recCase.last_action_result = `Settlement verified: ₹${settledAmount.toLocaleString('en-IN')} captured.`;
@@ -710,7 +714,9 @@ export class DatabaseService {
 
   public getAllAudits(): AuditRecord[] {
     this.ensureRecoveredSettlements();
-    return this.audits.slice().reverse();
+    // Retrieval order is authoritative: newest event first for the global
+    // audit view, with the stored event timestamp as the source of truth.
+    return this.audits.slice().sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }
 
   public getEscalations(): EscalationRecord[] {
@@ -833,6 +839,7 @@ export class DatabaseService {
 
     const statusChanged = recCase.status !== 'RECOVERED';
     const stepChanged = recCase.current_step !== 'VERIFIED_STOPPED';
+    const approvalChanged = recCase.requires_human_approval;
     const amountChanged = recCase.recovered_amount !== ledgerEntry.recovered_amount;
     const recoveredAtChanged = recCase.recovered_at !== ledgerEntry.verified_at;
     const resultText = `Settlement verified: ₹${ledgerEntry.recovered_amount.toLocaleString('en-IN')} captured.`;
@@ -840,10 +847,11 @@ export class DatabaseService {
 
     if (statusChanged) recCase.status = 'RECOVERED';
     if (stepChanged) recCase.current_step = 'VERIFIED_STOPPED';
+    if (approvalChanged) recCase.requires_human_approval = false;
     if (amountChanged) recCase.recovered_amount = ledgerEntry.recovered_amount;
     if (recoveredAtChanged) recCase.recovered_at = ledgerEntry.verified_at;
     if (resultChanged) recCase.last_action_result = resultText;
-    if (statusChanged || stepChanged || amountChanged || recoveredAtChanged || resultChanged) {
+    if (statusChanged || stepChanged || approvalChanged || amountChanged || recoveredAtChanged || resultChanged) {
       this.saveCase(recCase);
     }
 

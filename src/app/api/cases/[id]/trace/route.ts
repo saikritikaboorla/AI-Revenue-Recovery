@@ -33,24 +33,14 @@ export async function GET(
   if (!recCase.ai_decision) {
     recCase.ai_decision = aiDecision;
     db.saveCase(recCase);
-    db.addAudit({
-      id: `aud_${id}_ai_${Date.now()}`,
-      case_id: id,
-      timestamp: aiDecision.timestamp,
-      stage: 'DECIDE_PLAYBOOK',
-      actor: aiDecision.source === 'GEMINI_AI' ? 'GEMINI_DIAGNOSIS_ENGINE' : 'RECOVERAI_DECISION_ENGINE',
-      action: aiDecision.aiFallbackUsed ? 'DECISION_FALLBACK' : 'AUTOMATED_DECISION_REQUESTED',
-      result: aiDecision.escalationRequired ? 'ESCALATED' : 'DECIDED',
-      details: aiDecision.aiFallbackUsed
-        ? `Deterministic fallback used (${aiDecision.aiFallbackReason}). ${aiDecision.detectedIssue}. ${aiDecision.expectedOutcome}`
-        : `[AI: ${aiDecision.aiProvider ?? 'Gemini'} / ${aiDecision.aiModel}] ${aiDecision.detectedIssue}. ${aiDecision.expectedOutcome}`,
-      metadata: { aiDecision },
-    });
+    // Case Trace may cache decision evidence, but reads must not create a
+    // workflow event after action, verification, or recovery has occurred.
     await db.flushDurableState();
   }
-  const effectivePlaybook = aiDecision.selectedPlaybook !== 'HUMAN_ESCALATION' && aiDecision.selectedPlaybook in PLAYBOOK_CONFIGS
-    ? aiDecision.selectedPlaybook
-    : recCase.playbook;
+  // Trace execution state from the persisted case. The AI recommendation is
+  // evidence, but it is not an executed playbook until the pipeline adopts and
+  // persists it; mixing the two makes a historical trace internally false.
+  const effectivePlaybook = recCase.playbook;
   const config = PLAYBOOK_CONFIGS[effectivePlaybook] || seededConfig;
   const audits = db.getAuditsByCaseId(id);
 
@@ -127,7 +117,7 @@ export async function GET(
       },
       {
         stage: 'PLAYBOOK_SELECTED',
-        details: `${effectivePlaybook} selected by ${aiDecision.source === 'GEMINI_AI' && !aiDecision.aiFallbackUsed ? 'Gemini' : 'deterministic fallback'}${recCase.rationale ? `: ${recCase.rationale}` : ''}.`,
+        details: `${effectivePlaybook} is the persisted executed playbook${recCase.rationale ? `: ${recCase.rationale}` : '.'} AI recommendation evidence: ${aiDecision.selectedPlaybook}.`,
       },
       {
         stage: 'GUARDRAILS',

@@ -117,6 +117,32 @@ Expected business outcomes:
 | LLM call fails | Deterministic fallback, `aiFallbackUsed: true` |
 | Unexpected exception | `FAILED` |
 
+## 4a. Playbook verification map
+
+All seven UI playbooks are defined once in `src/lib/playbooks/index.ts` as
+`PLAYBOOK_CONFIGS`. Selection is performed by the validated Gemini result or
+`createAIDecision()` in `src/lib/ai-decision.ts`; execution is shared by
+`RecoveryPipeline.processCase()` in `src/lib/playbooks/engine.ts`. The pipeline
+checks merchant policy and deterministic guardrails, executes only the selected
+config's `allowedActions`, calls `DatabaseService.settleCase()` for verified
+settlement, and records case, ledger, and audit state in `src/lib/db/index.ts`.
+
+| Playbook | Selection signal | Bounded actions |
+|---|---|---|
+| Payment Degradation | Gateway timeout, bank downtime, network decline | Gateway/UPI/card failover |
+| Checkout Abandonment | Expired checkout or payment-page drop-off | Resume link, incentive, quick-pay |
+| Failed Subscription | Mandate, authentication, balance, or renewal failure | Method update, AFA link, grace period |
+| B2B Overdue Receivables | Overdue invoice, AP, PO, or dispute signal | Payment link, early discount, relationship escalation |
+| Mandate Retry | Paused mandate, insufficient funds, clearing/salary timing | Morning retry, split charge, mandate update |
+| Hinglish Recovery | Regional UPI confusion, payment help, discount query, dropped-call assist | Hinglish prompt, assisted IVR preview, UPI QR |
+| Promise-to-Pay | Deferred payment, installment, or broken-promise signal | Create commitment, reminder, breach escalation |
+
+Successful verification writes one idempotent ledger entry and a
+`SETTLEMENT_VERIFIED_AND_LEDGER_WRITTEN` audit event. Failed verification writes
+no recovered amount. Case Trace and decision reads cache decision evidence but
+do not create workflow events, so opening a completed case cannot append a late
+`DECIDE_PLAYBOOK` record after `VERIFY` or `RECOVERED`.
+
 ## 5. AI Decision Evidence — Case Trace
 
 Every processed case trace shows an "AI Decision Evidence" panel:

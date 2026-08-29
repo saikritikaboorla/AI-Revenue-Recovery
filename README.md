@@ -177,9 +177,11 @@ corresponding verification audit event.
   document in production so simulator cases survive serverless instances.
 - **AI layer:** `src/lib/ai-gemini.ts` — server-side only Gemini API call via
   `@google/genai`. Falls back to `src/lib/ai-decision.ts` on any failure.
-- **Decisioning:** `src/lib/ai-gemini.ts` (AI) → `src/lib/ai-decision.ts`
-  (deterministic fallback) → `src/lib/playbooks/engine.ts` (guardrails +
-  execution). The AI layer is the diagnosis layer only.
+- **Decisioning:** `src/lib/ai-gemini.ts` (AI diagnosis/recommendation) →
+  `src/lib/ai-decision.ts` (deterministic fallback) →
+  `src/lib/playbooks/engine.ts` (fixed playbook validation, guardrails +
+  bounded execution). The model never supplies an executable action outside
+  the selected playbook's declared `allowedActions`.
 - **Payments:** `RazorpayService`; mock mode is used when credentials are not
   configured.
 - **Hosting:** Vercel. Current deployment:

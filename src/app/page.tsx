@@ -33,15 +33,12 @@ interface Metrics {
 
 // ── Pipeline steps ───────────────────────────────────────────────────────────
 const PIPELINE_STEPS = [
-  { label: 'Detect',          desc: 'Webhook ingestion of failures & overdue events in real time.' },
-  { label: 'Diagnose',        desc: 'Deep contextual reasoning: LTV, error codes, banking latency.' },
-  { label: 'Risk Score',      desc: 'Probabilistic recovery score with confidence intervals.' },
-  { label: 'Select Playbook', desc: 'Maps failure signature to the optimal recovery strategy.' },
-  { label: 'Guardrail Check', desc: 'Max-retry, cooldown, contact-cap and value-threshold gates.' },
-  { label: 'Execute Action',  desc: 'WhatsApp link, gateway failover, IVR, or NACH reschedule.' },
-  { label: 'Verify',          desc: 'Razorpay webhook confirms successful settlement.' },
-  { label: 'Write Ledger',    desc: 'Append-only event written to the recovery ledger.' },
-  { label: 'Measure Recovery',desc: 'Win-rate, recovered value and automated attribution updated.' },
+  { label: 'Detect',    desc: 'Capture the revenue-risk signal.' },
+  { label: 'Diagnose',  desc: 'Gemini diagnosis when available.' },
+  { label: 'Decide',    desc: 'AI recommendation within fixed playbooks.' },
+  { label: 'Guard',     desc: 'Deterministic merchant policy checks.' },
+  { label: 'Act',       desc: 'Bounded action only after guardrails pass.' },
+  { label: 'Verify',    desc: 'Settlement evidence and ledger write.' },
 ];
 
 // ── Playbooks ────────────────────────────────────────────────────────────────
@@ -51,49 +48,49 @@ const PLAYBOOKS = [
     icon: CreditCard,
     accent: 'blue',
     title: 'Payment Degradation',
-    desc: 'Dynamic gateway failover via Razorpay Optimizer when issuing banks or UPI switches degrade. Zero customer friction.',
+    desc: 'Razorpay rail simulation for bounded gateway failover when issuing banks or UPI switches degrade.',
   },
   {
     num: '02',
     icon: ShoppingCart,
     accent: 'cyan',
     title: 'Checkout Abandonment',
-    desc: '1-click WhatsApp cart resumption with pre-filled UPI intent links. Recaptures high-intent D2C dropouts instantly.',
+    desc: 'Simulated WhatsApp checkout-resume preview with pre-filled UPI intent links for high-intent D2C dropouts.',
   },
   {
     num: '03',
     icon: RefreshCw,
     accent: 'purple',
     title: 'Failed Subscriptions',
-    desc: 'RBI e-mandate re-authentication (₹15k cap) via 1-tap approval links with automated grace-period management.',
+    desc: 'Bounded e-mandate re-authentication preview (₹15k cap) via approval links and grace-period management.',
   },
   {
     num: '04',
     icon: FileText,
     accent: 'amber',
     title: 'B2B Overdue Receivables',
-    desc: 'Net-30 invoice recovery with a 5% early settlement incentive and human-ops escalation when value thresholds are breached.',
+    desc: 'Net-30 invoice recovery preview with a 5% early-settlement incentive and human-ops escalation.',
   },
   {
     num: '05',
     icon: Clock,
     accent: 'indigo',
     title: 'Mandate Retry',
-    desc: 'Smart rescheduling targeting the 06:00 AM IST morning clearing window aligned to salary-credit cycles.',
+    desc: 'Bounded retry rescheduling targeting the 06:00 AM IST morning clearing window.',
   },
   {
     num: '06',
     icon: MessageSquare,
     accent: 'pink',
     title: 'Hinglish Recovery',
-    desc: 'Bilingual conversational WhatsApp outreach crafted for Indian D2C and retail segments to maximise open rates.',
+    desc: 'Simulated Hinglish Voice/WhatsApp Recovery — Preview for Indian D2C and retail segments.',
   },
   {
     num: '07',
     icon: Shield,
     accent: 'teal',
     title: 'Promise-to-Pay Tracker',
-    desc: 'Formalises settlement commitments with milestone tracking. Auto-escalates to legal ops on breach.',
+    desc: 'Formalises settlement commitments with milestone tracking and breach escalation.',
   },
 ];
 
@@ -397,11 +394,10 @@ export default function LandingPage() {
                 Recovery Playbooks
               </p>
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#F0F4FF] tracking-tight mb-4">
-                7 Production Recovery Vectors
+                7 Bounded Recovery Playbooks
               </h2>
               <p className="text-base text-[#6B7FA3] leading-relaxed">
-                Each playbook maps a distinct revenue-loss pattern to a bounded, auditable
-                intervention — from gateway failover to bilingual outreach.
+                Each playbook maps a revenue-loss signal to a bounded, auditable intervention.
               </p>
             </div>
 
@@ -479,7 +475,7 @@ export default function LandingPage() {
               </div>
               <div>
                 <p className="text-sm font-extrabold text-[#F0F4FF] leading-none">RecoverAI</p>
-                <p className="text-xs text-[#3B4F6A] mt-0.5">Deterministic Revenue Recovery Platform</p>
+                <p className="text-xs text-[#3B4F6A] mt-0.5">AI-Assisted Revenue Recovery Platform</p>
               </div>
             </div>
 

@@ -13,19 +13,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   if (!recCase.ai_decision) {
     recCase.ai_decision = decision;
     db.saveCase(recCase);
-    db.addAudit({
-      id: `aud_${id}_ai_${Date.now()}`,
-      case_id: id,
-      timestamp: decision.timestamp,
-      stage: 'DECIDE_PLAYBOOK',
-      actor: decision.source === 'GEMINI_AI' ? 'GEMINI_DIAGNOSIS_ENGINE' : 'RECOVERAI_DECISION_ENGINE',
-      action: decision.aiFallbackUsed ? 'DECISION_FALLBACK' : 'AUTOMATED_DECISION_REQUESTED',
-      result: decision.escalationRequired ? 'ESCALATED' : 'SUCCESS',
-      details: decision.aiFallbackUsed
-        ? `Deterministic fallback used (${decision.aiFallbackReason}). ${decision.detectedIssue}.`
-        : `[AI: ${decision.aiProvider ?? 'Gemini'} / ${decision.aiModel}] ${decision.detectedIssue}. ${decision.expectedOutcome}`,
-      metadata: { aiDecision: decision },
-    });
+    // A read may cache the decision for the next workflow request, but it must
+    // not append a late DECIDE event after execution has already completed.
     await db.flushDurableState();
   }
   return NextResponse.json({

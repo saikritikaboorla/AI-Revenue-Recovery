@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   return NextResponse.json({
     status: 'healthy',
-    service: 'RecoverAI — Deterministic Revenue Recovery Platform',
+    service: 'RecoverAI — AI-Assisted Revenue Recovery Platform',
     timestamp: new Date().toISOString(),
     razorpayIntegration: {
       mode: RazorpayService.getMode(),

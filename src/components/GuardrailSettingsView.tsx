@@ -118,9 +118,9 @@ const RULE_CARDS: RuleCardConfig[] = [
   },
   {
     key: 'enableAssistedVoiceForEnterpriseOnly',
-    label: 'Enable Assisted Voice for Enterprise Only',
+    label: 'Assisted Voice Policy',
     description:
-      'When enabled, assisted Voice IVR calls are restricted to ENTERPRISE and HIGH_LTV_VIP customer segments only. Reduces cost-per-intervention on lower-value segments while maximizing premium recovery.',
+      'Configured policy for the simulated Voice/WhatsApp recovery preview. When enabled, assisted voice is limited to ENTERPRISE and HIGH_LTV_VIP segments.',
     type: 'toggle',
     icon: <PhoneCall className="h-4 w-4" />,
   },
@@ -355,7 +355,7 @@ export const GuardrailSettingsView: React.FC = () => {
                   ) : (
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-[#98A2B3]">
-                        {(value as boolean) ? 'Enterprise Only — Enabled' : 'All Segments — Disabled'}
+                        {(value as boolean) ? 'Configured — Enabled' : 'Configured — Disabled'}
                       </span>
                       {/* Toggle Switch */}
                       <button
