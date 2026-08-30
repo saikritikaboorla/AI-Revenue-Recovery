@@ -98,6 +98,9 @@ No personally identifiable information beyond what is already in the case
 record is sent. The API key is read from `GEMINI_API_KEY` server-side and
 is never exposed to the client.
 
+<img width="1917" height="1198" alt="image" src="https://github.com/user-attachments/assets/2ef75b1c-8a57-4933-8ec4-ebe426ebf803" />
+
+
 ### What the model returns
 
 A validated JSON object:
