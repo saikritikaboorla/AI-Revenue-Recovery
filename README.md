@@ -71,6 +71,9 @@ validates the recommendation and enforces guardrails.
 | Hinglish Recovery | Bilingual outreach path with a clearly labelled simulated voice preview; no real call is placed. |
 | Promise-to-Pay | Commitment tracking, reminders, rescheduling, kept settlement, and broken-promise escalation. |
 
+<img width="1917" height="1198" alt="image" src="https://github.com/user-attachments/assets/29bee734-f363-4796-ba92-cad15a310c9c" />
+
+
 ## AI integration details
 
 ### Provider and model
